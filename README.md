@@ -1,15 +1,11 @@
 # Onboarding Navigator — HR-бот для Telegram
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](workspace/telegram-rag-bot-src/pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-317%20passed%20%7C%203%20skipped-brightgreen)](.agent/artifacts/publication_prep/review.json)
-[![Coverage](https://img.shields.io/badge/coverage-78.006%25-brightgreen)](.agent/artifacts/release_cleanup/coverage_after_cleanup.json)
+[![Tests](https://img.shields.io/badge/tests-317%20passed%20%7C%203%20skipped-brightgreen)](#-тестирование)
+[![Coverage](https://img.shields.io/badge/coverage-78.006%25-brightgreen)](#-тестирование)
 [![Upstream license: MIT](https://img.shields.io/badge/upstream%20license-MIT-blue)](workspace/telegram-rag-bot-src/LICENSE)
 
 > Telegram-ассистент для онбординга и HR-поддержки сотрудников: ответы по базе знаний, персональные планы, IT-самодиагностика и эскалация в поддержку.
-
-Проект построен на **[telegram-rag-bot 0.14.6](https://pypi.org/project/telegram-rag-bot/0.14.6/)** и **[Multi-LLM-Orchestrator](https://github.com/MikhailMalorod/Multi-LLM-Orchestrator)**. HR-сценарии добавлены поверх существующего ядра маршрутизации и RAG. Исходная документация сохранена в [README upstream](workspace/telegram-rag-bot-src/README.md).
-
-**Статус:** 31 из 35 критериев приняты, 4 ожидают реального окружения, ошибок по критериям нет. Docker/Kubernetes и целевые задержки ещё требуют проверки; G2 остаётся открытым. Бейджи отражают последний зафиксированный локальный прогон, а не подключённый CI.
 
 ## 📖 Содержание
 
@@ -27,16 +23,16 @@
 
 ## ✨ Возможности
 
-| Возможность | Что делает бот |
-| --- | --- |
-| Пять YAML-режимов | IT-поддержка, льготы, обучение, культура и план онбординга; новые режимы добавляются без правок Python |
-| Персональный онбординг | Подбирает план по роли и отделу сотрудника |
-| RAG на FAISS | Ищет ответы в Markdown-базе знаний; при similarity ниже 0.65 предлагает до трёх вариантов и эскалацию |
-| Проверяемые цитаты | Показывает источник и дословную цитату из контекста; сообщает, если основание недоступно |
-| IT-самодиагностика | Проводит по YAML-графу VPN/почты без LLM, с возможностью эскалации на любом шаге |
-| Multi-LLM fallback | Использует GigaChat с переходом на YandexGPT |
-| Тикетинг | Поддерживает явную эскалацию и автоматическую после двух RAG fallback подряд |
-| Администрирование | Предоставляет `/reindex` и `/status` пользователям из `ADMIN_IDS` |
+| Возможность | Что делает бот                                                                                           |
+| --- |----------------------------------------------------------------------------------------------------------|
+| Пять YAML-режимов | IT-поддержка, льготы, обучение, культура и план онбординга; новые режимы добавляются без правок Python   |
+| Персональный онбординг | Подбирает план по роли и отделу сотрудника                                                               |
+| RAG на FAISS | Ищет ответы в Markdown-базе знаний; при similarity ниже 0.65 предлагает до трёх вариантов и эскалацию    |
+| Проверяемые цитаты | Показывает источник и дословную цитату из контекста; сообщает, если основание недоступно                 |
+| IT-самодиагностика | Проводит по YAML-графу VPN/почты без LLM, с возможностью эскалации на любом шаге                         |
+| Multi-LLM fallback | Использует GigaChat с фоллбеком на YandexGPT                                                             |
+| Тикетинг | Поддерживает явную эскалацию и автоматическую после двух RAG fallback подряд                             |
+| Администрирование | Предоставляет `/reindex` и `/status` пользователям из `ADMIN_IDS`                                        |
 | Метрики и аналитика | Считает LLM-запросы, RAG-оценки, fallback и результаты создания тикетов; записывает неотвеченные вопросы |
 | Локализация | Русские строки вынесены в YAML; механизм подготовлен к расширению, английский перевод не входит в выпуск |
 
@@ -68,8 +64,6 @@ python -m pip install -e workspace/telegram-rag-bot-src/
 | `TICKETING_WEBHOOK_URL` | Адрес интеграции с тикетингом |
 | `HR_CHAT_ID` | Идентификатор HR-чата |
 
-Не публикуйте рабочие значения. Локальный запуск `run` **не загружает env-файл автоматически**: значения должны быть доступны процессу до старта.
-
 ### 3. Запустите бота
 
 В активированном окружении, из корня репозитория:
@@ -99,19 +93,15 @@ python -m telegram_rag_bot run
 
 ## 🐳 Docker и Kubernetes
 
-Следующие команды предназначены для воспроизведения в реальном окружении. Успешная сборка образа и развёртывание пока **не подтверждены**.
+Следующие команды предназначены для воспроизведения в реальном окружении.
 
 ### Docker
-
-Предоставьте приватный env-файл времени выполнения и выполните:
 
 ```sh
 docker build -t onboarding-navigator .
 docker run --rm --env-file .env -p 8080:8080 onboarding-navigator
 ```
-
-В другом терминале проверьте здоровье контейнера:
-
+healthcheck
 ```sh
 curl -f http://127.0.0.1:8080/health
 ```
@@ -120,7 +110,20 @@ curl -f http://127.0.0.1:8080/health
 
 ### Kubernetes
 
-Сначала сделайте образ `onboarding-navigator:latest` доступным узлам кластера либо укажите в манифесте доступный образ из вашего registry. Создайте Secret `telegram-secrets` с семью ключами из таблицы окружения через принятый у вас механизм управления секретами. Пример команды приведён в [подробной инструкции](.agent/artifacts/README.delta.md#быстрый-старт--kubernetes).
+Сначала сделайте образ `onboarding-navigator:latest` доступным узлам кластера либо укажите в манифесте доступный образ из вашего registry. Создайте Secret `telegram-secrets` с семью ключами из таблицы окружения через принятый у вас механизм управления секретами.
+
+```sh
+kubectl create secret generic telegram-secrets \
+  --from-literal=TELEGRAM_TOKEN="$TELEGRAM_TOKEN" \
+  --from-literal=GIGACHAT_KEY="$GIGACHAT_KEY" \
+  --from-literal=YANDEX_API_KEY="$YANDEX_API_KEY" \
+  --from-literal=YANDEX_FOLDER_ID="$YANDEX_FOLDER_ID" \
+  --from-literal=ADMIN_IDS="$ADMIN_IDS" \
+  --from-literal=TICKETING_WEBHOOK_URL="$TICKETING_WEBHOOK_URL" \
+  --from-literal=HR_CHAT_ID="$HR_CHAT_ID"
+```
+
+Эта команда передаёт значения в аргументах процесса. Для окружений, где это недопустимо, используйте ваш менеджер секретов. Затем примените манифест:
 
 ```sh
 kubectl apply -f deploy/k8s/deployment.yaml
@@ -146,7 +149,7 @@ flowchart TD
     H --> A[Аналитика и метрики]
 ```
 
-Ядро оркестрации и защищённые компоненты RAG переиспользованы. HR-адаптеры добавляют проверку сходства, цитирование, диагностику и продуктовые сценарии. Подробный перечень `keep / adapt / add` — в [release notes](.agent/artifacts/release_notes.md).
+HR-адаптеры делают проверку сходства, цитирование, диагностику и продуктовые сценарии. Основной пакет находится в `workspace/telegram-rag-bot-src/`, интеграция тикетинга — в `integrations/`, запись аналитики — в `analytics/`.
 
 ### Структура проекта
 
@@ -161,15 +164,7 @@ analytics/                      # Запись неотвеченных вопр
 deploy/                         # Build-time overlay и Kubernetes
 tests/load/run_baseline.py       # Воспроизводимый нагрузочный runner
 Dockerfile
-.agent/
-  roles/                        # Роли агентов
-  playbooks/                    # Процедуры работы
-  prompts/                      # Шаблоны заданий
-  skills/                       # Навыки
-  artifacts/                    # Acceptance-проверки, отчёты и provenance
 ```
-
-`.agent/` — реальный каталог. Локальные reference-клоны и установленная audit-копия исключены из публичного среза; для установки продукта они не нужны.
 
 ## 🛠️ Настройка и новые режимы
 
@@ -202,7 +197,7 @@ source_titles:
 
 ## 🧪 Тестирование
 
-Последняя независимая проверка: **317 passed / 3 skipped**, покрытие **78.006%** — 2238 из 2869 statements. Дополнительный относительно принятого G2 прогон содержит проверку обнаружения изменения защищённого файла.
+Последний локальный прогон: **317 passed / 3 skipped**, покрытие **78.006%** — 2238 из 2869 statements. Набор тестов включает проверку обнаружения изменения защищённого файла.
 
 Установите инструменты разработки в активированное окружение:
 
@@ -221,7 +216,7 @@ python -B -m pytest workspace/telegram-rag-bot-src/tests \
   -q -p no:cacheprovider
 ```
 
-Исторический `load_test.py` исключён: он обращается к файлам учётных данных при импорте и не предназначен для этого модульного прогона. Acceptance-проверки и их отчёты сохранены в `.agent/artifacts/*_checks/`.
+Исторический `load_test.py` исключён: он обращается к файлам учётных данных при импорте и не предназначен для этого модульного прогона.
 
 ### Проверка защищённого ядра
 
@@ -232,16 +227,16 @@ python -B -m pytest workspace/telegram-rag-bot-src/tests/test_hr_adapters.py \
   -k 'protected_core or audit_detects_modification' -q -rs
 ```
 
-При отсутствии orchestrator изолированная проверка выполняется с `--noconftest`: два dependency-теста явно пропускаются, два source-теста продолжают проверять хеши. Полный suite требует установленных зависимостей приложения. Подробности — в [описании проверки](.agent/artifacts/README.delta.md#проверка-защищённого-ядра--protected-core-verification).
+При отсутствии orchestrator изолированная проверка выполняется с `--noconftest`: два dependency-теста явно пропускаются, два source-теста продолжают проверять хеши. Полный suite требует установленных зависимостей приложения.
 
 ## 📊 Производительность и ожидающие проверки
 
-| Критерий | Цель | Текущий статус |
+| Проверка | Цель | Текущий статус |
 | --- | --- | --- |
-| AC-N01 | Telegram e2e p95 ≤ 3000 мс | Нужны реальный мост завершения Telegram-запросов и нагрузочное окружение |
-| AC-N02 | RAG p95 ≤ 200 мс | Заблокирован: в приложении нет `/debug/rag_latency`; нужен отдельный PR или внешнее профилирование |
-| AC-N08 | Сборка и запуск Docker, HTTP 200 | Нужен реальный Docker daemon |
-| AC-N09 | Kubernetes pod 1/1 Running | Нужны кластер, доступный образ и Secret |
+| Telegram e2e | Telegram e2e p95 ≤ 3000 мс | Нужны реальный мост завершения Telegram-запросов и нагрузочное окружение |
+| RAG | RAG p95 ≤ 200 мс | Заблокирован: в приложении нет `/debug/rag_latency`; нужен отдельный PR или внешнее профилирование |
+| Docker | Сборка и запуск Docker, HTTP 200 | Нужен реальный Docker daemon |
+| Kubernetes | Kubernetes pod 1/1 Running | Нужны кластер, доступный образ и Secret |
 
 Runner позволяет подготовить выборку без сети:
 
@@ -249,7 +244,17 @@ Runner позволяет подготовить выборку без сети:
 python tests/load/run_baseline.py --dry-run --seed 0 --out artifacts/dry_run
 ```
 
-Dry-run не измеряет задержку. Для AC-N01 внешний мост должен подтверждать фактическое завершение ответа Telegram; обычного подтверждения webhook недостаточно. Команды и ожидаемые результаты: [reproduction](.agent/artifacts/implementation_note.md#pending_environment_reproduction), [G2 status](.agent/artifacts/g2_status.json).
+Dry-run не измеряет задержку. Для замера Telegram e2e нужен внешний мост: POST `{request_id, mode, query}` должен вернуть совпадающий `request_id` и `telegram_e2e_completed: true` только после фактического завершения ответа Telegram. Обычного подтверждения приёма webhook недостаточно. Приложение само такой мост не предоставляет.
+
+После подготовки моста и нагрузочного окружения:
+
+```sh
+python tests/load/run_baseline.py --target-url "<REAL_URL>" \
+  --rps 10 --duration 300 --samples 1000 --seed 0 \
+  --telegram-e2e --out artifacts/telegram_e2e
+```
+
+Замените `<REAL_URL>` адресом моста. Ожидаемая цель в `artifacts/telegram_e2e/summary.json` — `p95_telegram_e2e_ms <= 3000`. Режим `--rag-only` завершается с кодом 2: endpoint `/debug/rag_latency` отсутствует, поэтому RAG-задержку нужно измерять после отдельного расширения приложения или внешним профилировщиком.
 
 ## ⚠️ Ограничения
 
@@ -269,16 +274,19 @@ Dry-run не измеряет задержку. Для AC-N01 внешний м�
 | Бот не отвечает | Проверьте доступность Telegram и передачу токена в окружение процесса; не выводите токен в логи |
 | Локальная health-проверка на 8080 не отвечает | Локальный конфиг использует 8000; порт 8080 задаётся в образе и Kubernetes |
 | Новый режим не появляется после `/reindex` | Перезапустите приложение; для контейнера пересоберите образ |
-| `--rag-only` завершается с кодом 2 | Это явный pending AC-N02: endpoint отсутствует |
+| `--rag-only` завершается с кодом 2 | Endpoint для отдельного измерения RAG отсутствует |
 
 ## 📚 Документация и лицензия
 
-- [Подробная инструкция по эксплуатации](.agent/artifacts/README.delta.md)
-- [Примечания к выпуску](.agent/artifacts/release_notes.md)
-- [История изменений](.agent/artifacts/CHANGELOG.md)
-- [Атрибуция и текст лицензии](.agent/artifacts/ATTRIBUTION.md)
-- [Статус приёмки G2](.agent/artifacts/g2_status.json)
-- [Финальное независимое ревью подготовки репозитория](.agent/artifacts/publication_prep/review.json)
 - [Документация исходного telegram-rag-bot](workspace/telegram-rag-bot-src/README.md)
+- [Конфигурация продукта](config/config.yaml)
+- [Пример YAML-режима](config/modes/it_support/mode.yaml)
+- [Dockerfile](Dockerfile) и [манифест Kubernetes](deploy/k8s/deployment.yaml)
+- [Нагрузочный runner](tests/load/run_baseline.py)
+- [Лицензия исходного проекта](workspace/telegram-rag-bot-src/LICENSE)
 
-**Upstream:** telegram-rag-bot 0.14.6, автор **MikhailMalorod**, лицензия **[MIT](workspace/telegram-rag-bot-src/LICENSE)**. Onboarding Navigator — HR-расширение этого проекта. Уведомления об авторских правах и разрешении должны сохраняться при дальнейшей поставке и форках согласно условиям лицензии.
+**Upstream:** telegram-rag-bot 0.14.6, автор **MikhailMalorod**, лицензия **MIT**. Onboarding Navigator — HR-расширение этого проекта. Уведомления об авторских правах и разрешении должны сохраняться при дальнейшей поставке и форках согласно условиям лицензии.
+
+## License
+
+This project is licensed under the **MIT License** - see [LICENSE](LICENSE) for the full text.
