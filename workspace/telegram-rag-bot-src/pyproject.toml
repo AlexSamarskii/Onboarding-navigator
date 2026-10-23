@@ -83,7 +83,7 @@ telegram_rag_bot = ["templates/*", "py.typed"]
 "*" = ["__pycache__", "*.pyc", "*.pyo", "*.orig", "*.rej", "*.bak"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "../../.agent/artifacts/backend_rest_core_checks", "../../.agent/artifacts/backend_rest_adapters_checks", "../../.agent/artifacts/backend_rest_wiring_checks"]
+testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-p no:cacheprovider"
 

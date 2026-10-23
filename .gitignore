@@ -63,3 +63,9 @@ analytics/unanswered.jsonl
 .agent/artifacts/reviewer_core_final_tmp2/
 .agent/artifacts/reviewer_core_final_tmp/
 .agent/artifacts/g0-build-env/
+.agent/
+.agents/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
+workspace/README.md

@@ -1,7 +1,0 @@
-{
-  "check": "ast_parse",
-  "python": "3.13.17",
-  "files": 62,
-  "failures": [],
-  "note": "syntax only; not build, runtime or tests"
-}

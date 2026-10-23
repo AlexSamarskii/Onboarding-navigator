@@ -1,5 +1,0 @@
-{
-  "test_before_sha256": "22c988a05281f2d625fd338b9b7993ce46de9c8e44c744c4dcdf835b77777cb9",
-  "test_acceptance_sha256": "2b319a14316b266ebbdd87bea4c8d0044daed0e199a388eaf79a70a2e525e822",
-  "authorization": "User B1 explicit adaptation overrides prior i18n guard for test_hr_adapters.py only. Other7accepted_i18n and44source remain frozen."
-}

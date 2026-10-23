@@ -215,15 +215,13 @@ def test_diagnostic_cycle_is_rejected(tmp_path):
 
 def test_ast_no_ui_cyrillic():
     # The strict replacement is also collected as a standalone artifact test.
-    import runpy
-    checks = runpy.run_path(str(ROOT / '.agent/artifacts/backend_rest_i18n_checks/test_legacy_and_ui_cyrillic.py'))
+    from tests.test_i18n_cyrillic import assert_ui_cyrillic_allowed
     checks['assert_ui_cyrillic_allowed']((SOURCE / 'handlers.py').read_text(), False)
     checks['assert_ui_cyrillic_allowed']((SOURCE / 'mode_loader.py').read_text(), True)
 
 
 def test_ast_negative_control_rejects_new_ui_even_with_noqa():
-    import runpy
-    check = runpy.run_path(str(ROOT / '.agent/artifacts/backend_rest_i18n_checks/test_legacy_and_ui_cyrillic.py'))['assert_ui_cyrillic_allowed']
+    from tests.test_i18n_cyrillic import assert_ui_cyrillic_allowed
     with pytest.raises(AssertionError): check('text = "Неожиданная строка"  # noqa: i18n\n', False)
 
 
