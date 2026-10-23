@@ -1,0 +1,17 @@
+{
+  "stage": "G1b",
+  "inputs": {
+    "repo_map": ".agent/artifacts/repo_map.json",
+    "file_change_plan": ".agent/artifacts/file_change_plan.yaml",
+    "architecture_plan": ".agent/artifacts/architecture_plan.md",
+    "acceptance_criteria": ".agent/artifacts/acceptance_criteria.yaml",
+    "provenance_check": ".agent/artifacts/u01_provenance_check.json"
+  },
+  "output": ".agent/artifacts/reuse_map.yaml",
+  "scope": "Review all adapt entries, concrete public contracts, risks, linked AC; no implementation or new scope",
+  "constraints": [
+    "U01 active: metadata[source]+page_content, no native chunk_id",
+    "Protected core files KEEP",
+    "Write artifacts only; no sensitive file reads"
+  ]
+}

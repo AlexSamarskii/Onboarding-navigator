@@ -1,0 +1,33 @@
+{
+  "subject": "release-docs",
+  "author_context_ids": [
+    "/root",
+    "/root/release_docs"
+  ],
+  "reviewer_context_id": "/root/reviewer_release",
+  "content_digests": {
+    ".agent/artifacts/g2_status.json": "58731011d8cc3627ad16391f8d8dd0e2b06a5eff45d20409db9faa1e05fabdd7",
+    ".agent/artifacts/release_notes.md": "29453e63f460c1480610c7ad5c6bf650d867a7f6be6140c36e68a9890a039a86",
+    ".agent/artifacts/README.delta.md": "a4422a36f40b288b7390c0fbd0060095df25e4b0ede4eb11ce622e2e27f2fe3e",
+    ".agent/artifacts/CHANGELOG.md": "1e6f40180e6b8336b64a5ccff114180538d08cf8ac761f745d2b81e6d0c35bf5",
+    ".agent/artifacts/ATTRIBUTION.md": "ed009007abe82c7d07fc56321d7ea1f1ba0beca94060806c9c10a7dab8e1e203"
+  },
+  "patch_sha256": "a997ebb5aceba636355d3abaa7953caf8a6c0199c59043c2160a29946a4ba023",
+  "frozen_hashes_checked": 44,
+  "unchanged": 44,
+  "accepted_i18n_hashes_checked": 8,
+  "infra_digests_checked": 11,
+  "g2_status_frozen_sha256": "58731011d8cc3627ad16391f8d8dd0e2b06a5eff45d20409db9faa1e05fabdd7",
+  "checks": {
+    "AC_ids": "31+4=35 matches acceptance_criteria.yaml",
+    "upstream_license": "MIT, full notice read from source LICENSE and included verbatim",
+    "source_tests": "not rerun: docs-only final delta, exact source hashes restored",
+    "runtime_commands": "not run; operator reproduction only"
+  },
+  "authorized_restoration": {
+    "file": "workspace/telegram-rag-bot-src/telegram_rag_bot/__main__.py",
+    "reason": "Unexpected mid-release external edit broke Project structure print across lines; user explicitly approved restoring only that line. Final SHA256 exactly baseline, ast.parse succeeds. No source delta remains."
+  },
+  "schema_validation": "not_run: manifest schema unavailable",
+  "evidence_orphans": "not_run: ao unavailable"
+}

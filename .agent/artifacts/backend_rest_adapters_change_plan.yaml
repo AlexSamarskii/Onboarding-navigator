@@ -1,0 +1,91 @@
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py
+  action: add
+  reason: 'Proposed external LocalFAISSProvider subclass/facade and BaseRetriever:
+    native single scored search, gate before LLM, unchanged source/page_content; multi-source
+    indexing coordinator and provider observation delegates; no RAG rewrite. Preserve
+    load_index.cache_clear and invalidate both inherited and facade caches after save/delete;
+    verify reindex freshness.'
+  linked_ac:
+  - AC-S6
+  - AC-F02
+  - AC-F03
+  - AC-N02
+  - AC-N03
+  - AC-N04
+  - AC-N05
+  - AC-N06
+  - AC-C02
+  - AC-C03
+  - AC-U01
+  - AC-O01
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py
+  action: add
+  reason: Proposed citation adapter on exact returned context; allowlist source title,
+    validate verbatim quote; no second retrieval or fabricated chunk_id.
+  linked_ac:
+  - AC-U01
+  - AC-S6
+  - AC-C03
+  - AC-C07
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py
+  action: add
+  reason: Proposed deterministic YAML graph execution/validation all paths; explicit
+    escalation at every step, no commands/credential prompts or RAG counter mutation.
+  linked_ac:
+  - AC-U02
+  - AC-S1
+  - AC-S7
+  - AC-C04
+  - AC-C05
+  - AC-C06
+  owner_role: backend-rest
+- path: integrations/__init__.py
+  action: add
+  reason: Proposed root application package; Docker/local deployment root is explicit
+    import path, not installed dependency folder.
+  linked_ac:
+  - AC-F05
+  owner_role: backend-rest
+- path: integrations/ticketing.py
+  action: add
+  reason: Proposed root HTTP webhook adapter; exact fields UUID/hash/UTC, notify_chat_id
+    optional,3 attempts pauses1/2/4 and5s timeout, redacted errors/dedupe.
+  linked_ac:
+  - AC-S7
+  - AC-F05
+  - AC-N07
+  - AC-N11
+  - AC-C05
+  owner_role: backend-rest
+- path: analytics/__init__.py
+  action: add
+  reason: Proposed root application package; runtime log is mounted as file in separate
+    data volume so Python package is not hidden.
+  linked_ac:
+  - AC-S4
+  - AC-O02
+  owner_role: backend-rest
+- path: analytics/writer.py
+  action: add
+  reason: Proposed root redaction and JSONL writer, mandatory missing_plan, ordinary
+    unanswered optional; runtime data not staged/committed, no U04 editor report.
+  linked_ac:
+  - AC-S4
+  - AC-O02
+  - AC-C05
+  owner_role: backend-rest
+- path: integrations/__init__.py
+  action: add
+  reason: Package initializer explicitly authorized in adapters subzone
+  linked_ac:
+  - AC-F05
+  owner_role: backend-rest
+- path: analytics/__init__.py
+  action: add
+  reason: Package initializer explicitly authorized in adapters subzone
+  linked_ac:
+  - AC-O02
+  - AC-S4
+  owner_role: backend-rest

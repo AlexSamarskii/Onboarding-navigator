@@ -1,0 +1,42 @@
+{
+  "clone": "/tmp/hr_bot_clone_test",
+  "public_files": 393,
+  "symlink_index_objects": 0,
+  "agent_real": true,
+  "agents_absent": true,
+  "git_size_mb": 2.03515625,
+  "contains_forbidden_runtime_reference_paths": false,
+  "env_paths_policy": "Not accessed/copied; all env-pattern paths including example omitted from this code-validation simulation",
+  "original_git_staging_performed": false,
+  "tests": "317 passed, 3 skipped",
+  "coverage": {
+    "covered_lines": 2238,
+    "num_statements": 2869,
+    "percent_covered": 78.00627396305333,
+    "percent_covered_display": "78",
+    "missing_lines": 631,
+    "excluded_lines": 14,
+    "percent_statements_covered": 78.00627396305333,
+    "percent_statements_covered_display": "78"
+  },
+  "dependency_install": "offline editable install into external temporary venv; existing .venv dependencies shared read-only, audit copy not in clone or PYTHONPATH",
+  "git_index_entries": 393,
+  "clone_retained_until_independent_review": false,
+  "test_files_policy": "load_test.py excluded as accepted credential-file-loading runner",
+  "clone_removed_after_independent_review": true,
+  "temporary_directories_removed": [
+    {
+      "path": "/tmp/b2_clone_test",
+      "absent": true
+    },
+    {
+      "path": "/tmp/hr_bot_clone_test",
+      "absent": true
+    },
+    {
+      "path": "/tmp/hr_bot_publication_venv",
+      "absent": true
+    }
+  ],
+  "cleanup_at_utc": "2026-10-23T20:42:40.496346+00:00"
+}

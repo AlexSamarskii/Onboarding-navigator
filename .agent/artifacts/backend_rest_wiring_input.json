@@ -1,0 +1,18 @@
+{
+  "stage": "G2/backend-rest-wiring",
+  "allowed_files": [
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/main.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/handlers.py",
+    "workspace/telegram-rag-bot-src/pyproject.toml"
+  ],
+  "snapshot": ".agent/artifacts/backend_rest_wiring_snapshot.json",
+  "change_plan": ".agent/artifacts/backend_rest_wiring_change_plan.yaml",
+  "review_limit": 3,
+  "tests_directory": ".agent/artifacts/backend_rest_wiring_checks",
+  "stop_before": "backend-rest-i18n",
+  "risk_ac": [
+    "AC-C07",
+    "AC-N01",
+    "AC-N02"
+  ]
+}

@@ -1,0 +1,103 @@
+# Universal Telegram Chatbot Configuration
+# Environment variables: ${VAR_NAME} will be substituted from .env
+
+# Telegram Bot Configuration
+telegram:
+  token: ${TELEGRAM_TOKEN}  # Bot token from @BotFather
+  admin_ids: []  # List of admin user IDs (optional, e.g., [123456789, 987654321])
+
+# Multi-LLM Orchestrator Configuration
+orchestrator:
+  strategy: "best-available"  # Routing strategy: "best-available", "round-robin", "cost-optimized"
+  providers:
+    # GigaChat Provider (Russian LLM)
+    - name: "gigachat"
+      type: "GigaChatProvider"
+      enabled: true
+      config:
+        api_key: ${GIGACHAT_KEY}  # OAuth2 authorization key
+        model: "GigaChat-Pro"
+        scope: "GIGACHAT_API_PERS"  # Personal scope (or GIGACHAT_API_CORP for corporate)
+        timeout_seconds: 25
+    
+    # YandexGPT Provider (Russian LLM)
+    - name: "yandex_gpt"
+      type: "YandexGPTProvider"
+      enabled: true
+      config:
+        api_key: ${YANDEX_API_KEY}  # IAM token (valid for 12 hours)
+        folder_id: ${YANDEX_FOLDER_ID}  # Yandex Cloud folder ID
+        model: "yandexgpt/latest"
+        timeout_seconds: 25
+
+# Embeddings Configuration (vectorization providers)
+embeddings:
+  type: "local"  # Choose: "local" (offline), "gigachat" (Sber API), "yandex" (Yandex Cloud)
+  
+  # Local embeddings (HuggingFace sentence-transformers)
+  local:
+    model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    batch_size: 32
+  
+  # GigaChat Embeddings API (requires GIGACHAT_EMBEDDINGS_KEY)
+  gigachat:
+    api_key: ${GIGACHAT_EMBEDDINGS_KEY}  # Optional: only if using gigachat embeddings
+    model: "Embeddings"
+    batch_size: 16
+    timeout_seconds: 30
+    scope: "GIGACHAT_API_PERS"
+  
+  # Yandex AI Studio Embeddings (requires YANDEX_EMBEDDINGS_KEY)
+  yandex:
+    api_key: ${YANDEX_EMBEDDINGS_KEY}  # Optional: only if using yandex embeddings
+    folder_id: ${YANDEX_FOLDER_ID}  # Optional: only if using yandex embeddings
+    model_uri: "emb://${YANDEX_FOLDER_ID}/text-search-doc/latest"
+    batch_size: 1  # API limitation: 1 text per request
+    timeout_seconds: 10
+
+# Vector Store Configuration (storage backends)
+vectorstore:
+  type: "faiss"  # Choose: "faiss" (local disk), "opensearch" (cloud cluster)
+  
+  # Local FAISS storage
+  faiss:
+    indices_dir: ".faiss_indices"
+  
+  # OpenSearch cloud storage (requires OPENSEARCH_HOST, OPENSEARCH_USER, OPENSEARCH_PASSWORD)
+  opensearch:
+    host: ${OPENSEARCH_HOST}  # Optional: only if using opensearch
+    port: 9200
+    index_name: "telegram-bot-faq"
+    username: ${OPENSEARCH_USER}  # Optional: only if using opensearch
+    password: ${OPENSEARCH_PASSWORD}  # Optional: only if using opensearch
+
+# LangChain Configuration (document processing)
+langchain:
+  chunk_size: 1000  # Document chunk size for splitting
+  chunk_overlap: 200  # Overlap between chunks
+
+# FAQ Modes Configuration
+# Each mode has its own system prompt and FAQ file
+modes:
+  it_support:
+    system_prompt: |
+      Ты профессиональный IT-специалист компании Dipaul.
+      Помогай сотрудникам решать технические проблемы.
+      Используй FAQ для фактов, если применимо.
+      Отвечай на русском языке чётко и по делу.
+    faq_file: "faqs/it_support_faq.md"  # Path to FAQ markdown file
+    timeout_seconds: 30  # Request timeout
+    max_tokens: 1024  # Maximum tokens in response
+
+# Storage Configuration
+storage:
+  sessions:
+    type: "memory"  # "memory" for MVP, "redis" for production
+    url: ${REDIS_URL}  # Optional for MVP (None if not set)
+    ttl_seconds: 86400  # Session TTL: 24 hours
+
+# Logging Configuration
+logging:
+  level: "INFO"  # Logging level: DEBUG, INFO, WARNING, ERROR
+  format: "text"  # Log format: "text" for MVP, "json" for production
+

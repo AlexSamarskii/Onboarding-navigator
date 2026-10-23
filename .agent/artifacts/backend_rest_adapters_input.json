@@ -1,0 +1,21 @@
+{
+  "stage": "G2/backend-rest-adapters",
+  "allowed_files": [
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py",
+    "integrations/__init__.py",
+    "integrations/ticketing.py",
+    "analytics/__init__.py",
+    "analytics/writer.py"
+  ],
+  "change_plan": ".agent/artifacts/backend_rest_adapters_change_plan.yaml",
+  "snapshot": ".agent/artifacts/backend_rest_adapters_snapshot.json",
+  "tests_directory": ".agent/artifacts/backend_rest_adapters_checks",
+  "review_limit": 3,
+  "stop_before": "backend-rest-handlers",
+  "approved_clarifications": {
+    "citation": "Return entire exact nonempty page_content from allowed source. No-match means empty/missing/unallowed context. User confirmed.",
+    "retry": "max_attempts=3: at most3 POST with sleeps1,2 before attempts2,3. No post-final sleep; backoff4 unused. User confirmed."
+  }
+}

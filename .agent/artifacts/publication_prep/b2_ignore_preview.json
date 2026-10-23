@@ -1,0 +1,21 @@
+{
+  "preview_root": "/tmp/hr_bot_b2_ignore_preview_sonq3yts",
+  "method": "C pathname-only ignore model; no actual migration, no source copies, no staging.",
+  "internal_link_paths_checked": 300,
+  "ignored_internal_link_paths": 300,
+  "preserved_probes": [
+    ".agent/artifacts/coverage.json",
+    ".agent/artifacts/review.json",
+    ".agent/artifacts/backend_rest_core_checks/test_session_profile.py",
+    ".agent/artifacts/backend_rest_i18n_snapshot.json",
+    ".agent/roles/orchestrator.md",
+    ".agent/skills/implement/SKILL.md",
+    "config/modes/it_support/faq.md",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/main.py",
+    "skills-lock.json",
+    "CLAUDE.md"
+  ],
+  "preserved_probes_passed": 10,
+  "gitignore_sha256": "b203ff024dd5734b79159f7c2da7cb6752ae7795799ecc91cbb2891af74b5ffb",
+  "index_mode_check": "not_run; actual migration and publication copy require explicit option choice."
+}

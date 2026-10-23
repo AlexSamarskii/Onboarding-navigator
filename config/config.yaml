@@ -1,0 +1,19 @@
+# Product preflight configuration; environment substitution belongs to ConfigLoader.
+modes:
+  directory: "modes"
+rag:
+  score_threshold: 0.65
+integrations:
+  ticketing:
+    url: "${TICKETING_WEBHOOK_URL}"
+    hr_chat_id: "${HR_CHAT_ID}"
+i18n:
+  default_locale: "ru"
+ADMIN_IDS: "${ADMIN_IDS}"
+session:
+  ttl_seconds: 86400
+retrieval:
+  async_mode: false
+llm:
+  # Ordered first-available policy; backend-rest wires this to the existing Router.
+  providers: [gigachat, yandexgpt]

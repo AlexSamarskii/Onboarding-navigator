@@ -1,0 +1,24 @@
+{
+  "stage": "G1a",
+  "agent": "Uniqueness Agent",
+  "tz_text": "HR-бот Onboarding Navigator: онбординг и HR-поддержка сотрудников",
+  "inputs": {
+    "acceptance_criteria": ".agent/artifacts/acceptance_criteria.yaml",
+    "repo_map": ".agent/artifacts/repo_map.json",
+    "baseline_report": ".agent/artifacts/baseline_report.md"
+  },
+  "constraints": {
+    "AC-C02": "Не менять ядро multi-LLM fallback",
+    "AC-C03": "Не менять ядро RAG",
+    "AC-C04": "Сохранить YAML-режимы",
+    "AC-C05": "Секреты только в .env; не читать .env/.env.* при работе агента",
+    "AC-C06": "Соблюдать out of scope: без голоса, календаря, аналитического UI, авторизации в HR-системах, произвольных действий и EN",
+    "AC-C07": "i18n readiness без реализации EN"
+  },
+  "requested_output": ".agent/artifacts/change_proposal.md",
+  "strategy_count": {"min": 4, "max": 6},
+  "required_fields": ["AC references or proposed AC", "increment beyond S1-S8", "YAML/adapters feasibility", "impact low|med|high", "risk", "effort S|M|L", "novelty"],
+  "recommendation": "Recommend 2-3 strategies for MVP; others backlog. Recommendations are proposals, not automatic scope changes.",
+  "stop_after": "change_proposal.md",
+  "prohibited": ["implementation", "architecture_plan", "file_change_plan", "editing acceptance criteria", "rebranding S1-S8 as novel features", "reading sensitive files"]
+}

@@ -1,0 +1,29 @@
+{
+  "stage": "G1b",
+  "inputs": {
+    "acceptance_criteria": ".agent/artifacts/acceptance_criteria.yaml",
+    "repo_map": ".agent/artifacts/repo_map.json",
+    "baseline": ".agent/artifacts/baseline_report.md",
+    "proposal": ".agent/artifacts/change_proposal.md",
+    "provenance": ".agent/artifacts/u01_provenance_check.json"
+  },
+  "decisions": {
+    "U01": "active mandatory: decision A; source + page_content available",
+    "U02": "active mandatory",
+    "U03": "backlog",
+    "U04": "backlog",
+    "U05": "backlog"
+  },
+  "outputs": [
+    ".agent/artifacts/architecture_plan.md",
+    ".agent/artifacts/file_change_plan.yaml"
+  ],
+  "constraints": [
+    "No implementation; plan only",
+    "No protected core changes AC-C02/C03",
+    "Preserve all 35 acceptance criteria",
+    "Use actual source checkout workspace/telegram-rag-bot-src for planned project source changes; installed tree is evidence, not editing target",
+    "No .env/.env.* access or plan to agent-edit secret files",
+    "Write artifacts only under .agent/artifacts"
+  ]
+}

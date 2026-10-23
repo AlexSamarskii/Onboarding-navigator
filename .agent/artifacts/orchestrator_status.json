@@ -1,0 +1,176 @@
+{
+  "agent": "Orchestrator",
+  "status": "ok",
+  "current_gate": "G2",
+  "agent_called": "Reviewer/publication-final",
+  "next_action": "stop_before_publication",
+  "artifact_ref": ".agent/artifacts/publication_prep/review.json",
+  "task_graph": [
+    {
+      "task": "G0",
+      "status": "pass"
+    },
+    {
+      "task": "G1: acceptance finalization per user override",
+      "status": "pass"
+    },
+    {
+      "task": "Implementation",
+      "status": "not authorized"
+    },
+    {
+      "task": "G1a Uniqueness proposal",
+      "status": "complete; recommendations only"
+    },
+    {
+      "task": "G1a approved uniqueness criteria formalization",
+      "status": "complete: 35 AC, existing 33 unchanged"
+    },
+    {
+      "task": "G1b architecture and reuse planning",
+      "status": "complete; draft for approval, implementation not started"
+    },
+    {
+      "task": "G2 data prerequisite check",
+      "status": "need_info: RU catalog absent; no data edits"
+    },
+    {
+      "task": "G2 backend-preflight",
+      "status": "completed; review approve, data awaits user confirmation"
+    },
+    {
+      "task": "G2 data",
+      "status": "complete; review approve 2/3, stop before backend-rest"
+    },
+    {
+      "task": "G2 backend-rest-core",
+      "status": "complete; review2 approve; stop before backend-rest-adapters"
+    },
+    {
+      "task": "G2 backend-rest-adapters",
+      "status": "complete; review2 approve; stop before backend-rest-handlers"
+    },
+    {
+      "task": "G2 backend-rest-wiring",
+      "status": "complete;review1 approve;stop before backend-rest-i18n"
+    },
+    {
+      "task": "G2 backend-rest-i18n",
+      "status": "complete;review2 approve;stop before infra"
+    },
+    {
+      "task": "G2 infra",
+      "status": "complete offline; review approve1/3; pending real environment; G2 open"
+    },
+    {
+      "task": "Release/Docs",
+      "status": "complete;reviewapprove1/3;G2conditional;pending4;stop"
+    },
+    {
+      "task": "release-cleanup/proposal",
+      "status": "complete; independent review approve"
+    },
+    {
+      "task": "publication-prep/B2",
+      "status": "C implemented; independent review approve"
+    },
+    {
+      "task": "publication-prep/B1",
+      "status": "complete; independent review approve"
+    },
+    {
+      "task": "publication-prep/B3",
+      "status": "complete; independent review approve"
+    },
+    {
+      "task": "release-cleanup/execution",
+      "status": "complete; independent review approve"
+    }
+  ],
+  "iterations": {
+    "audit_calls": 3,
+    "max_iterations": null,
+    "note": "User did not specify a limit",
+    "tz_calls": 4,
+    "uniqueness_calls": 1
+  },
+  "notes": "B2-C, B1, B3-LOCAL и cleanup завершены и независимо приняты: 0 blockers, 0 major. 317 passed / 3 skipped; coverage 78.006% unchanged; source frozen 44/44. Два временных клона и временный venv удалены, backup сохранены. Ручной env-gate подтверждён пользователем. Оригинальный индекс не менялся. G2 не закрыт.",
+  "questions": [],
+  "completed_gates": {
+    "G0": "pass",
+    "G1": "pass: user-defined acceptance finalization gate"
+  },
+  "conditional_acceptance": {
+    "AC-U01": "active: A, metadata[source]+page_content under latest user decision; no native chunk_id",
+    "AC-U02": "approved mandatory"
+  },
+  "g1b_started": true,
+  "g1b_completed": true,
+  "plan_approved": true,
+  "review_fix_iterations": {
+    "reviews_used": 2,
+    "formal_fix_cycles": 1,
+    "limit": 3,
+    "resolved": "Five duplicate locale keys replaced by existing semantic keys plus original decoration."
+  },
+  "substage": "publication-prep",
+  "substage_status": "complete; independent review approve",
+  "g2_complete": false,
+  "data_started": true,
+  "backend_rest_started": true,
+  "data_complete": true,
+  "backend_rest_core_complete": true,
+  "backend_rest_adapters_started": true,
+  "tests": {
+    "target_tests_passed": 276,
+    "source_tests_passed": 317,
+    "source_tests_skipped": 3,
+    "covered_lines": 2238,
+    "statements": 2869,
+    "line_coverage_percent": 78.00627396305333,
+    "frozen_unchanged": 44,
+    "snapshot_patch_exact": true,
+    "reverse_apply_check": "pass",
+    "historical_i18n_unchanged": 7,
+    "historical_i18n_authorized_B1_test_delta": 1
+  },
+  "risks": [
+    "Coverage currently qualifies at78.0063%; future source changes require a fresh line-coverage gate.",
+    "AC-N01/N02 live performance, deployment and full G2 acceptance remain unverified."
+  ],
+  "backend_rest_adapters_complete": true,
+  "backend_rest_handlers_started": false,
+  "backend_rest_wiring_started": true,
+  "backend_rest_i18n_started": true,
+  "backend_rest_wiring_complete": true,
+  "backend_rest_i18n_complete": true,
+  "infra_started": false,
+  "superseded_tests": [
+    {
+      "file": ".agent/artifacts/backend_rest_wiring_checks/test_i18n_keys_used.py",
+      "archive": ".agent/artifacts/backend_rest_wiring_checks/test_i18n_keys_used.py.superseded",
+      "sha256": "81b87f6526a3c86d3dd0fa4946b454c835fc11949165c90730586cbcf6f68e63",
+      "replacement": ".agent/artifacts/backend_rest_i18n_checks/test_legacy_and_ui_cyrillic.py",
+      "reason": "Approved migration supersedes whole-handlers literal retention. Body bytes after three-line header unchanged. User clarified A covers extracted legacy method only; B strict UI AST and C locale keys cover remaining UI. Reviewer ran obsolete assertion and observed expected AssertionError, and ran useful archived locale/metadata assertions successfully."
+    }
+  ],
+  "gate_status": "pass_with_pending_environment",
+  "pending_environment": [
+    "AC-N01",
+    "AC-N02",
+    "AC-N08",
+    "AC-N09"
+  ],
+  "publication_prep": {
+    "B2": "C",
+    "B3": "LOCAL_UNSTAGE_NOOP",
+    "cleanup_deleted_targets": 15,
+    "env_readiness": "user_attested; not accessed by agent",
+    "original_index_mutated": false,
+    "clone_symlink_objects": 0,
+    "independent_review": "approve; 0 blockers; 0 major",
+    "temporary_clones_removed": true,
+    "backup_archives_preserved": true,
+    "review_fix_cycles": 0
+  }
+}

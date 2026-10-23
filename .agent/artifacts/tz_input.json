@@ -1,0 +1,15 @@
+{
+  "tz_text": "HR-бот Onboarding Navigator: онбординг и HR-поддержка сотрудников",
+  "constraints": [
+    "Python 3.11+",
+    "Не менять ядро multi-LLM fallback и RAG",
+    "Сохранить YAML-режимы"
+  ],
+  "target_version": "0.14.6",
+  "repo_map_ref": ".agent/artifacts/repo_map.json",
+  "baseline_ref": ".agent/artifacts/baseline_report.md",
+  "role_ref": ".agent/roles/tz-agent.md",
+  "scope": "G1: TZ Agent only; no implementation, no automatic G1 approval",
+  "requirements_policy": "Only explicit requirements; AGENTS context ideas do not automatically become mandatory. Return questions on ambiguous onboarding/HR scenarios.",
+  "supersedes_scope_restriction": "User authorized proceeding to TZ Agent after G0 passes; earlier G0-only restriction no longer applies after passing G0."
+}

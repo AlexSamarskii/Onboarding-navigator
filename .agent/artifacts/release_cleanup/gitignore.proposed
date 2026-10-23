@@ -1,0 +1,64 @@
+# Секреты: шаблон примера разрешён, рабочие значения не публикуются.
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+secrets/
+
+# Python: окружения, кэши и результаты сборки.
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+*.coverage
+/.coverage
+/.coverage.*
+/coverage.json
+*.whl
+*.tar.gz
+
+# Локальные результаты прогонов и FAISS; product analytics/*.py остаются.
+/artifacts/
+/.faiss_indices/
+analytics/unanswered.jsonl
+
+# Транзиентные agent-файлы. .agent -> .agents: учитываем оба написания.
+.agent/artifacts/**/tmp*/
+.agent/artifacts/**/reviewer_tmp*/
+.agent/artifacts/**/__pycache__/
+.agent/artifacts/**/*.pyc
+.agent/artifacts/**/.coverage*
+.agent/artifacts/**/test_report.xml
+.agent/artifacts/**/coverage_run.log
+.agent/artifacts/**/*.log
+.agents/artifacts/**/tmp*/
+.agents/artifacts/**/reviewer_tmp*/
+.agents/artifacts/**/__pycache__/
+.agents/artifacts/**/*.pyc
+.agents/artifacts/**/.coverage*
+.agents/artifacts/**/test_report.xml
+.agents/artifacts/**/coverage_run.log
+.agents/artifacts/**/*.log
+
+# Reference-клоны остаются локально. Forked source здесь не исключается.
+/workspace/telegram-rag-bot/
+/workspace/multi-llm-orchestrator/
+/workspace/sirchatalot-reference/
+
+# IDE/OS и локальные настройки инструментов; решение D перед применением.
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+/.codex/
+/.claude/

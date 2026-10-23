@@ -1,0 +1,18 @@
+{
+  "repo_path": "./workspace/telegram-rag-bot",
+  "reference_paths": [
+    "./workspace/multi-llm-orchestrator",
+    "./workspace/sirchatalot-reference"
+  ],
+  "tz_text": "HR-бот Onboarding Navigator: онбординг и HR-поддержка сотрудников",
+  "constraints": "Python 3.11+, не менять ядро multi-LLM fallback и RAG, сохранить YAML-режимы",
+  "scope": "G0",
+  "target_version": "0.14.6",
+  "version_basis": "User explicitly approved v0.14.6 during audit",
+  "prohibited_actions": [
+    "implementation",
+    "TZ Agent",
+    "dependency installation",
+    "external LLM/Telegram calls"
+  ]
+}

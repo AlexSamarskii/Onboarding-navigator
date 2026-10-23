@@ -1,0 +1,294 @@
+{
+  "targets": [
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "kind": "directory",
+      "bytes": 103163,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_adapters_checks/reviewer_tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "164K\t.agent/artifacts/backend_rest_adapters_checks/reviewer_tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/tmp",
+      "kind": "directory",
+      "bytes": 103157,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_adapters_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "168K\t.agent/artifacts/backend_rest_adapters_checks/tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_wiring_checks/tmp",
+      "kind": "directory",
+      "bytes": 0,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_wiring_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "0B\t.agent/artifacts/backend_rest_wiring_checks/tmp"
+    },
+    {
+      "path": ".agent/artifacts/g0_reaudit/tmp",
+      "kind": "directory",
+      "bytes": 0,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/g0_reaudit/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "0B\t.agent/artifacts/g0_reaudit/tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "kind": "directory",
+      "bytes": 18996,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/tmp_acceptance"
+      ],
+      "du_exit_code": 0,
+      "du_output": "44K\t.agent/artifacts/backend_rest_i18n_checks/tmp_acceptance"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "kind": "directory",
+      "bytes": 470,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/tmp_adapters"
+      ],
+      "du_exit_code": 0,
+      "du_output": "28K\t.agent/artifacts/backend_rest_i18n_checks/tmp_adapters"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp",
+      "kind": "directory",
+      "bytes": 148004,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "632K\t.agent/artifacts/backend_rest_i18n_checks/tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "kind": "directory",
+      "bytes": 25043,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/tmp_coverage"
+      ],
+      "du_exit_code": 0,
+      "du_output": "356K\t.agent/artifacts/backend_rest_i18n_checks/tmp_coverage"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "kind": "file",
+      "bytes": 53248,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/.coverage"
+      ],
+      "du_exit_code": 0,
+      "du_output": "52K\t.agent/artifacts/backend_rest_i18n_checks/.coverage"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "kind": "file",
+      "bytes": 7102,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_i18n_checks/coverage_run.log"
+      ],
+      "du_exit_code": 0,
+      "du_output": "8.0K\t.agent/artifacts/backend_rest_i18n_checks/coverage_run.log"
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_core_checks/tmp",
+      "kind": "directory",
+      "bytes": 13199,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_rest_core_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "676K\t.agent/artifacts/backend_rest_core_checks/tmp"
+    },
+    {
+      "path": ".agent/artifacts/infra_checks/tmp",
+      "kind": "directory",
+      "bytes": 779210,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/infra_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "780K\t.agent/artifacts/infra_checks/tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "kind": "directory",
+      "bytes": 189,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_preflight_checks/reviewer_tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "72K\t.agent/artifacts/backend_preflight_checks/reviewer_tmp"
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/tmp",
+      "kind": "directory",
+      "bytes": 189,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        ".agent/artifacts/backend_preflight_checks/tmp"
+      ],
+      "du_exit_code": 0,
+      "du_output": "72K\t.agent/artifacts/backend_preflight_checks/tmp"
+    },
+    {
+      "path": "/tmp/trb-sdist",
+      "kind": "directory",
+      "bytes": 122785,
+      "outside_repo": true,
+      "du_command": [
+        "du",
+        "-sh",
+        "-I",
+        ".env",
+        "-I",
+        ".env.*",
+        "-I",
+        ".idea",
+        "/tmp/trb-sdist"
+      ],
+      "du_exit_code": 0,
+      "du_output": "120K\t/tmp/trb-sdist"
+    }
+  ],
+  "total_bytes": 1374755,
+  "reference_upstreams": {
+    "multi-llm-orchestrator": {
+      "url_sanitized": "https://github.com/MikhailMalorod/Multi-LLM-Orchestrator.git",
+      "exit_code": 0
+    },
+    "sirchatalot-reference": {
+      "url_sanitized": "https://github.com/sazonovanton/SirChatalot.git",
+      "exit_code": 0
+    }
+  },
+  "root_readme_exists": false,
+  "extra_root_entries": [
+    ".faiss_indices",
+    "skills-lock.json",
+    ".claude",
+    ".codex",
+    "CLAUDE.md"
+  ]
+}

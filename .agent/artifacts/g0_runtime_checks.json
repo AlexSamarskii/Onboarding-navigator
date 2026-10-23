@@ -1,0 +1,54 @@
+[
+  {
+    "name": "cli_help",
+    "command": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "-B",
+      "-m",
+      "telegram_rag_bot",
+      "--help"
+    ],
+    "cwd": "/Users/alesamarskij/projects/hr_bot/workspace/telegram-rag-bot",
+    "returncode": 0,
+    "output": "usage: telegram-bot [-h] {init,run,rebuild,version} ...\n\nTelegram RAG Bot - Production-ready FAQ bot with Russian LLMs\n\npositional arguments:\n  {init,run,rebuild,version}\n                        Available commands\n    init                Create new bot project from template\n    run                 Run bot from current directory\n    rebuild             Rebuild FAQ index for mode\n    version             Show version and project information\n\noptions:\n  -h, --help            show this help message and exit\n\nFor more information: https://github.com/MikhailMalorod/telegram-bot-universal\n"
+  },
+  {
+    "name": "cli_version",
+    "command": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "-B",
+      "-m",
+      "telegram_rag_bot",
+      "version"
+    ],
+    "cwd": "/Users/alesamarskij/projects/hr_bot/workspace/telegram-rag-bot",
+    "returncode": 0,
+    "output": "telegram-rag-bot v0.14.6\nhttps://github.com/MikhailMalorod/telegram-bot-universal\n"
+  },
+  {
+    "name": "cli_run_missing_config",
+    "command": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "-B",
+      "-m",
+      "telegram_rag_bot",
+      "run"
+    ],
+    "cwd": "/Users/alesamarskij/projects/hr_bot/workspace/telegram-rag-bot",
+    "returncode": 1,
+    "output": "❌ config/config.yaml not found\n💡 Make sure you're in a project directory\nRun 'telegram-bot init <name>' to create a new project\n"
+  },
+  {
+    "name": "pytest_version",
+    "command": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "-B",
+      "-m",
+      "pytest",
+      "--version"
+    ],
+    "cwd": "/Users/alesamarskij/projects/hr_bot/workspace/telegram-rag-bot",
+    "returncode": 1,
+    "output": "/opt/homebrew/opt/python@3.13/bin/python3.13: No module named pytest\n"
+  }
+]

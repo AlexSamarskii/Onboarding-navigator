@@ -1,0 +1,12 @@
+name: it_support
+display_name: mode.it_support
+description: Ответы на вопросы IT-поддержки
+enabled: true
+files:
+  system_prompt: system_prompt.md
+  faq: faq.md
+timeout_seconds: 30
+source_titles:
+  faq.md: mode.it_support
+  system_prompt.md: mode.it_support
+diagnostics_file: diagnostics.yaml

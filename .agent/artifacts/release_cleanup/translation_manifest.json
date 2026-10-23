@@ -1,0 +1,13 @@
+{
+  "docs": {
+    "release_notes.md": "ea42db2b88bdbf7ec7c51dd705cecee3b24bc81130f2d6b8bf959a0b42f39e45",
+    "README.delta.md": "6f18d2f079bdea54494a31a8ff64f8e8029d38dd15374b2e916beeb0815db6dd",
+    "CHANGELOG.md": "0a70db65e87df64ad7c027c291ee61298080e44a3e3a2f5566dff405e09efac2",
+    "ATTRIBUTION.md": "c5d43f9e8930eb1a89c820d1e5dee19a2df8a772fc39e73860404b100e269d96"
+  },
+  "fenced_blocks_unchanged": true,
+  "g2_status_unchanged": true,
+  "source_and_infra_hashes_unchanged": 63,
+  "gitignore_unchanged": true,
+  "cleanup_executed": false
+}

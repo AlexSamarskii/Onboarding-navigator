@@ -1,0 +1,842 @@
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/mode_loader.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/mode_loader.py
+@@ -10,11 +10,46 @@
+ """
+ 
+ import logging
++import re
++from pathlib import PureWindowsPath
++from telegram_rag_bot.i18n import t
+ from pathlib import Path
+ from typing import Dict, Any, Optional
+ import yaml
+ 
+ logger = logging.getLogger(__name__)
++
++
++class ModeValidationError(ValueError):
++    """An enabled mandatory bundle cannot be loaded safely."""
++
++
++MANDATORY_MODES = frozenset({"it_support", "benefits", "learning", "culture", "onboarding_plan"})
++
++
++def _bundle_path(bundle: Path, value: str) -> Path:
++    """Resolve only bundle-contained relative paths, without opening them."""
++    if not isinstance(value, str) or not value or "\\" in value:
++        raise ModeValidationError("bundle path must be a nonempty relative string")
++    path = Path(value)
++    if path.is_absolute() or PureWindowsPath(value).drive or ".." in path.parts:
++        raise ModeValidationError("bundle path must not escape its directory")
++    if any(part in {".idea", ".env"} or part.startswith(".env.") for part in path.parts):
++        raise ModeValidationError("restricted bundle path")
++    target = (bundle / path).resolve()
++    if not target.is_relative_to(bundle.resolve()):
++        raise ModeValidationError("bundle symlink escapes its directory")
++    if any(part in {".idea", ".env"} or part.startswith(".env.") for part in target.parts):
++        raise ModeValidationError("restricted bundle target")
++    return target
++
++
++def _marker(key: str, fallback: str, content: str) -> str:
++    try:
++        translated = t(key)
++        return translated if translated and translated in content else fallback
++    except (RuntimeError, KeyError, ValueError):
++        return fallback
+ 
+ 
+ class ModeLoader:
+@@ -76,11 +111,18 @@
+             try:
+                 mode = self._load_mode(mode_dir)
+                 if mode is None:
+-                    continue  # Mode was skipped (disabled or error)
+-
++                    if mode_dir.name in MANDATORY_MODES:
++                        raise ModeValidationError("mandatory mode configuration missing")
++                    continue
++
++                # Disabled entries are intentionally skipped before validating identity.
++                if mode.get("enabled", True) is False:
++                    continue
+                 mode_name = mode.get("name")
+                 if not mode_name:
+-                    logger.warning(f"Mode in {mode_dir} has no 'name' field, skipping")
++                    if mode_dir.name in MANDATORY_MODES:
++                        raise ModeValidationError("mandatory mode name is required")
++                    logger.warning("Optional mode has no name, skipping")
+                     continue
+ 
+                 # Check if mode is enabled
+@@ -89,17 +131,34 @@
+                     continue
+ 
+                 modes[mode_name] = mode
+-                logger.info(f"✅ Loaded mode: {mode_name}")
+-
+-            except Exception as e:
+-                logger.error(f"Failed to load mode from {mode_dir}: {e}", exc_info=True)
+-                # Continue loading other modes even if one fails
++                logger.info("Loaded mode: %s", mode_name)
++
++            except Exception as exc:
++                if mode_dir.name in MANDATORY_MODES or getattr(exc, "mandatory", False):
++                    raise ModeValidationError("mandatory mode failed validation") from exc
++                logger.error("Optional mode failed validation")
+                 continue
+ 
+         logger.info(f"✅ Loaded {len(modes)} mode(s) from {self.modes_dir}")
+         return modes
+ 
+     def _load_mode(self, mode_dir: Path) -> Optional[Dict[str, Any]]:
++        # Track parsed mandatory identity even when the directory is renamed.
++        identity = None
++        path = _bundle_path(mode_dir, "mode.yaml")
++        if path.is_file():
++            try:
++                identity = yaml.safe_load(path.read_text(encoding="utf-8"))
++            except yaml.YAMLError:
++                pass
++        try:
++            return self._load_mode_content(mode_dir)
++        except Exception as exc:
++            if isinstance(identity, dict) and identity.get("name") in MANDATORY_MODES:
++                exc.mandatory = identity.get("enabled", True) is not False
++            raise
++
++    def _load_mode_content(self, mode_dir: Path) -> Optional[Dict[str, Any]]:
+         """Load mode configuration from directory.
+ 
+         Loads mode.yaml, system_prompt.md, faq.md, and optionally examples.yaml.
+@@ -122,21 +181,21 @@
+             logger.warning(f"⏭️ Skipped mode: mode.yaml not found in {mode_dir}")
+             return None
+ 
+-        # Load mode.yaml
++        # Validate additive fields without resolving labels or changing baseline values.
+         try:
+-            mode = yaml.safe_load(mode_yaml_path.read_text(encoding="utf-8"))
+-            if mode is None:
+-                logger.error(f"mode.yaml is empty in {mode_dir}")
+-                return None
+-        except yaml.YAMLError as e:
+-            logger.error(f"Invalid YAML in {mode_dir}/mode.yaml: {e}")
+-            return None
+-
+-        # Validate required fields
++            mode = yaml.safe_load(_bundle_path(mode_dir, "mode.yaml").read_text(encoding="utf-8"))
++        except yaml.YAMLError as exc:
++            raise ModeValidationError("invalid bundle YAML") from exc
++        if not isinstance(mode, dict):
++            raise ModeValidationError("mode must be a mapping")
++        if mode.get("enabled", True) is False:
++            return mode  # Disabled bundles do not require their data files.
++        try:
++            self._validate_fields(mode_dir, mode)
++        except ModeValidationError as exc:
++            exc.mandatory = mode.get("name") in MANDATORY_MODES
++            raise
+         files = mode.get("files", {})
+-        if not isinstance(files, dict):
+-            logger.error(f"Invalid 'files' section in {mode_dir}/mode.yaml")
+-            return None
+ 
+         # 1. Load system_prompt.md (required)
+         system_prompt_file = files.get("system_prompt")
+@@ -144,27 +203,23 @@
+             logger.error(f"Missing 'files.system_prompt' in {mode_dir}/mode.yaml")
+             return None
+ 
+-        system_prompt_path = mode_dir / system_prompt_file
++        system_prompt_path = _bundle_path(mode_dir, system_prompt_file)
+         if not system_prompt_path.exists():
+             raise FileNotFoundError(f"Missing required file: {system_prompt_path}")
+ 
+         # Load system_prompt content
+         system_prompt_content = system_prompt_path.read_text(encoding="utf-8")
+ 
+-        # Parse greeting using split-based approach (more reliable than regex)
+-        # Platform SaaS format:
+-        # # ПРИВЕТСТВИЕ
+-        # Привет, я ваш помогайка, шеф!
+-        # Используйте это приветствие, если пользователь спрашивает 'Кто ты?' или 'Привет'.
+-        # ---
+-        # # РОЛЬ И ПОВЕДЕНИЕ
+-        # Ты дружелюбный AI-помощник...
++        # Three literal fallbacks explicitly preserve old bundles without a loaded locale.
++        greeting_header = _marker("loader.greeting_header", "# ПРИВЕТСТВИЕ", system_prompt_content)
++        greeting_instruction = _marker("loader.greeting_instruction", "Используйте это приветствие", system_prompt_content)
++        role_header = _marker("loader.role_header", "# РОЛЬ И ПОВЕДЕНИЕ", system_prompt_content)
+ 
+         # Step 1: Split by "---" separator (first occurrence only)
+         parts = system_prompt_content.split("---", 1)
+ 
+         # Step 2: Check if greeting section exists
+-        if len(parts) >= 2 and "# ПРИВЕТСТВИЕ" in parts[0]:
++        if len(parts) >= 2 and greeting_header in parts[0]:
+             greeting_section = parts[0]
+             system_prompt_section = parts[1]
+ 
+@@ -175,14 +230,14 @@
+ 
+             for line in lines:
+                 # Skip until we find the header
+-                if "# ПРИВЕТСТВИЕ" in line:
++                if greeting_header in line:
+                     found_header = True
+                     continue
+ 
+                 # After header, collect non-empty lines
+                 if found_header and line.strip():
+                     # Stop at instruction line (Platform SaaS adds this)
+-                    if "Используйте это приветствие" in line:
++                    if greeting_instruction in line:
+                         break
+                     greeting_lines.append(line.strip())
+ 
+@@ -200,9 +255,9 @@
+                 system_prompt_cleaned = system_prompt_section.strip()
+ 
+                 # Check if "# РОЛЬ И ПОВЕДЕНИЕ" header exists
+-                if "# РОЛЬ И ПОВЕДЕНИЕ" in system_prompt_cleaned:
++                if role_header in system_prompt_cleaned:
+                     # Split by header and take everything after it
+-                    role_parts = system_prompt_cleaned.split("# РОЛЬ И ПОВЕДЕНИЕ", 1)
++                    role_parts = system_prompt_cleaned.split(role_header, 1)
+                     if len(role_parts) == 2:
+                         mode["system_prompt"] = role_parts[1].strip()
+                     else:
+@@ -212,7 +267,7 @@
+                     # No "# РОЛЬ И ПОВЕДЕНИЕ" header → use full content after ---
+                     mode["system_prompt"] = system_prompt_cleaned
+                     logger.warning(
+-                        f"Greeting found but no '# РОЛЬ И ПОВЕДЕНИЕ' header in {system_prompt_path}. "
++                        f"Greeting found but no role header in {system_prompt_path}. "
+                         "Using content after '---' as system_prompt."
+                     )
+             else:
+@@ -231,7 +286,7 @@
+             logger.error(f"Missing 'files.faq' in {mode_dir}/mode.yaml")
+             return None
+ 
+-        faq_path = mode_dir / faq_file
++        faq_path = _bundle_path(mode_dir, faq_file)
+         if not faq_path.exists():
+             raise FileNotFoundError(f"Missing required file: {faq_path}")
+ 
+@@ -242,7 +297,7 @@
+         # 3. Load examples.yaml (optional)
+         examples_file = files.get("examples")
+         if examples_file:
+-            examples_path = mode_dir / examples_file
++            examples_path = _bundle_path(mode_dir, examples_file)
+             if examples_path.exists():
+                 try:
+                     examples_content = yaml.safe_load(
+@@ -259,6 +314,43 @@
+ 
+         return mode
+ 
++    @staticmethod
++    def _validate_fields(mode_dir: Path, mode: dict) -> None:
++        for field in ("name", "display_name", "description"):
++            if field in mode and not isinstance(mode[field], str):
++                raise ModeValidationError(f"{field} must be a string")
++        if "enabled" in mode and type(mode["enabled"]) is not bool:
++            raise ModeValidationError("enabled must be a bool")
++        if "timeout_seconds" in mode and (
++            type(mode["timeout_seconds"]) not in (int, float)
++            or mode["timeout_seconds"] < 0
++        ):
++            raise ModeValidationError("timeout_seconds must be nonnegative")
++        files = mode.get("files")
++        if not isinstance(files, dict) or not files.get("system_prompt") or not files.get("faq"):
++            raise ModeValidationError("files.system_prompt and files.faq are required")
++        for key in ("system_prompt", "faq", "examples"):
++            if key in files:
++                _bundle_path(mode_dir, files[key])
++        if "source_titles" in mode:
++            titles = mode["source_titles"]
++            if not isinstance(titles, dict):
++                raise ModeValidationError("source_titles must be a mapping")
++            for source, title in titles.items():
++                _bundle_path(mode_dir, source)
++                if not isinstance(title, str):
++                    raise ModeValidationError("source title must be a string")
++        if "diagnostics_file" in mode:
++            target = _bundle_path(mode_dir, mode["diagnostics_file"])
++            if not target.is_file():
++                raise ModeValidationError("diagnostics_file must exist")
++        if "plans_directory" in mode:
++            name = mode["plans_directory"]
++            if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9_-]+", name):
++                raise ModeValidationError("plans_directory must be a lowercase single component")
++            if not _bundle_path(mode_dir, name).is_dir():
++                raise ModeValidationError("plans_directory must exist")
++
+     def get_mode(self, mode_name: str) -> Optional[Dict[str, Any]]:
+         """Get mode configuration by name.
+ 
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/config_loader.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/config_loader.py
+@@ -5,6 +5,10 @@
+ """
+ 
+ import os
++import json
++import math
++from urllib.parse import urlsplit
++from pathlib import PureWindowsPath
+ import re
+ import yaml
+ import logging
+@@ -89,7 +93,10 @@
+             raise ValueError("Config file is empty or invalid YAML")
+ 
+         # Substitute environment variables
+-        config = ConfigLoader._substitute_env_vars(config)
++        product = isinstance(config, dict) and not ("telegram" in config or "orchestrator" in config)
++        config = ConfigLoader._substitute_env_vars(config, preserve_missing=product)
++        if product and isinstance(config.get("ADMIN_IDS"), str):
++            config["ADMIN_IDS"] = ConfigLoader._parse_admin_ids(config["ADMIN_IDS"])
+ 
+         # Validate required sections
+         ConfigLoader._validate_config(config)
+@@ -122,6 +129,7 @@
+ 
+         # Загрузить modes через ModeLoader (уже импортирован в начале файла)
+         mode_loader = ModeLoader(modes_dir)
++        config["modes_directory"] = str(modes_dir)
+         config["modes"] = mode_loader.load_all_modes()
+ 
+         logger.info(f"✅ Loaded {len(config['modes'])} mode(s) from {modes_dir}")
+@@ -129,7 +137,7 @@
+         return config
+ 
+     @staticmethod
+-    def _substitute_env_vars(obj: Any) -> Any:
++    def _substitute_env_vars(obj: Any, preserve_missing: bool = False) -> Any:
+         """
+         Recursively substitute environment variables in config.
+ 
+@@ -146,11 +154,11 @@
+         """
+         if isinstance(obj, dict):
+             # Recursively process dict values
+-            return {k: ConfigLoader._substitute_env_vars(v) for k, v in obj.items()}
++            return {k: ConfigLoader._substitute_env_vars(v, preserve_missing) for k, v in obj.items()}
+ 
+         elif isinstance(obj, list):
+             # Recursively process list items
+-            return [ConfigLoader._substitute_env_vars(item) for item in obj]
++            return [ConfigLoader._substitute_env_vars(item, preserve_missing) for item in obj]
+ 
+         elif isinstance(obj, str):
+             # Find all ${VAR_NAME} patterns
+@@ -174,7 +182,7 @@
+                 else:
+                     # Optional var not set → return empty string
+                     # This handles both cases: entire string is placeholder or part of larger string
+-                    return ""
++                    return match.group(0) if preserve_missing else ""
+ 
+             # Replace all occurrences
+             result = re.sub(pattern, replace_var, obj)
+@@ -195,7 +203,12 @@
+         Raises:
+             ValueError: If required section is missing
+         """
+-        # Проверить обязательные секции (убрать "modes" из списка)
++        if not isinstance(config, dict):
++            raise ValueError("config must be a mapping")
++        if "telegram" not in config and "orchestrator" not in config:
++            ConfigLoader._validate_product(config)
++            return
++        # Legacy requires both sections, preserving platform validation below.
+         required_sections = ["telegram", "orchestrator"]
+ 
+         for section in required_sections:
+@@ -230,6 +243,87 @@
+ 
+         logger.info("✅ Config validation passed")
+ 
++    @staticmethod
++    def _parse_admin_ids(value: str) -> Any:
++        """Product environment IDs accept JSON integer arrays or comma-separated ints.
++
++        An unset full placeholder is preserved for offline config validation;
++        an explicitly empty env value means no administrators (fail closed).
++        """
++        if re.fullmatch(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}", value):
++            return value
++        if not value.strip():
++            return []
++        try:
++            if value.strip().startswith("["):
++                result = json.loads(value)
++            else:
++                parts = value.split(",")
++                if any(not re.fullmatch(r"[0-9]+", part.strip()) for part in parts):
++                    raise ValueError
++                result = [int(part) for part in parts]
++        except (ValueError, TypeError) as exc:
++            raise ValueError("ADMIN_IDS must be an integer list or placeholder") from exc
++        if not isinstance(result, list) or any(type(item) is not int for item in result):
++            raise ValueError("ADMIN_IDS must contain integers")
++        return result
++
++    @staticmethod
++    def _validate_product(config: dict) -> None:
++        def section(name: str) -> dict:
++            value = config.get(name)
++            if not isinstance(value, dict):
++                raise ValueError(f"{name} must be a mapping")
++            return value
++
++        directory = section("modes").get("directory")
++        if (not isinstance(directory, str) or not directory
++                or Path(directory).is_absolute() or PureWindowsPath(directory).drive
++                or "\\" in directory or ".." in Path(directory).parts):
++            raise ValueError("modes.directory must be a relative path")
++        score = section("rag").get("score_threshold")
++        if type(score) not in (int, float) or not math.isfinite(score) or not 0 <= score <= 1:
++            raise ValueError("rag.score_threshold must be a finite number in [0,1]")
++        integrations = section("integrations")
++        ticketing = integrations.get("ticketing")
++        if not isinstance(ticketing, dict):
++            raise ValueError("integrations.ticketing must be a mapping")
++        url = ticketing.get("url")
++        if not isinstance(url, str) or not url:
++            raise ValueError("ticketing.url must be an HTTP URL or placeholder")
++        placeholder = re.fullmatch(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}", url)
++        if not placeholder:
++            try:
++                parsed = urlsplit(url)
++                valid = (parsed.scheme in {"http", "https"} and parsed.hostname
++                         and not parsed.username and not parsed.password and not parsed.fragment
++                         and not any(char.isspace() for char in url))
++                parsed.port
++            except ValueError:
++                valid = False
++            if not valid:
++                raise ValueError("ticketing.url must be an HTTP URL without credentials")
++        if "hr_chat_id" in ticketing and not isinstance(ticketing["hr_chat_id"], str):
++            raise ValueError("ticketing.hr_chat_id must be a string")
++        locale = section("i18n").get("default_locale")
++        if not isinstance(locale, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", locale):
++            raise ValueError("i18n.default_locale must be a locale string")
++        admins = config.get("ADMIN_IDS")
++        if isinstance(admins, str):
++            admins = ConfigLoader._parse_admin_ids(admins)
++        if not (isinstance(admins, str) or isinstance(admins, list)
++                and all(type(item) is int for item in admins)):
++            raise ValueError("ADMIN_IDS must be an integer list or placeholder")
++        ttl = section("session").get("ttl_seconds")
++        if type(ttl) is not int or ttl < 0:
++            raise ValueError("session.ttl_seconds must be a nonnegative integer")
++        if type(section("retrieval").get("async_mode")) is not bool:
++            raise ValueError("retrieval.async_mode must be a boolean")
++        providers = section("llm").get("providers")
++        if not isinstance(providers, list) or not providers or any(
++                not isinstance(item, str) or not item.strip() for item in providers):
++            raise ValueError("llm.providers must be an ordered nonempty string list")
++
+ 
+ def reload_config(config_path: str = "config/config.yaml") -> Dict[str, Any]:
+     """
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/utils/session_manager.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/utils/session_manager.py
+@@ -7,9 +7,21 @@
+ import json
+ import logging
+ from typing import Dict, Any, Optional
+-from datetime import datetime, timedelta
++from datetime import datetime, timedelta, timezone
++from copy import deepcopy
++from functools import wraps
++from collections import defaultdict
++from asyncio import Lock
+ 
+ logger = logging.getLogger(__name__)
++
++
++def _serialized_event(method):
++    @wraps(method)
++    async def wrapped(self, user_id, *args, **kwargs):
++        async with self._event_locks[user_id]:
++            return await method(self, user_id, *args, **kwargs)
++    return wrapped
+ 
+ 
+ class SessionManager:
+@@ -21,6 +33,14 @@
+     - In-memory fallback (dict)
+     - TTL support (default 24h)
+     - Lazy cleanup (on get_session)
++
++    Memory fallback is process-local only: it provides neither shared state nor
++    cross-pod ticket deduplication. Redis I/O remains synchronous with bounded
++    socket/connect timeouts. Event helpers serialize same-session updates within this process/event loop;
++    callers performing manual get/set read-modify-write must serialize themselves.
++    set_profile is the explicit profile-input API; set_session never refreshes
++    its set_at_iso. record_rag_fallback/record_rag_success/record_ticket_created
++    are the only automatic streak event APIs; diagnostics writes do not count.
+     """
+ 
+     def __init__(self, redis_url: Optional[str] = None, ttl_seconds: int = 86400):
+@@ -31,10 +51,13 @@
+             redis_url: Redis connection URL (None for memory-only)
+             ttl_seconds: Session TTL in seconds (default: 24h)
+         """
++        if type(ttl_seconds) is not int or ttl_seconds < 0:
++            raise ValueError("ttl_seconds must be a nonnegative integer")
+         self.redis_url = redis_url
+         self.ttl_seconds = ttl_seconds
+         self.memory_store: Dict[int, Dict[str, Any]] = {}
+         self.use_redis = False
++        self._event_locks = defaultdict(Lock)
+         self.redis_client = None
+         self._active_users = set()  # Track active user IDs for metrics
+ 
+@@ -43,13 +66,13 @@
+             try:
+                 import redis
+ 
+-                self.redis_client = redis.from_url(redis_url)
++                self.redis_client = redis.from_url(redis_url, socket_connect_timeout=5, socket_timeout=5)
+                 self.redis_client.ping()  # Verify connection
+                 self.use_redis = True
+                 logger.info("✅ Using Redis for session storage")
+             except Exception as e:
+                 logger.warning(
+-                    f"⚠️ Redis unavailable: {e}. Falling back to memory storage."
++                    "Redis unavailable; using process-local memory storage"
+                 )
+                 self.use_redis = False
+         else:
+@@ -63,8 +86,8 @@
+             user_id: Telegram user ID
+ 
+         Returns:
+-            Session dict or None if not found (Redis path only).
+-            Always returns dict (via _default_session) in memory path.
++            Session dictionary normalized identically for Redis and memory.
++            A miss yields _default_session, preserving the legacy behavior.
+ 
+         Example:
+             >>> session = await session_manager.get_session(123)
+@@ -79,43 +102,105 @@
+             try:
+                 data = self.redis_client.get(f"session:{user_id}")
+                 if data:
+-                    return json.loads(data)
++                    session = self._normalize(user_id, json.loads(data))
++                    return session
+             except Exception as e:
+-                logger.error(f"Redis get error: {e}")
++                logger.error("Redis read failed; using process-local memory")
+                 # Fall through to memory
+ 
+-        # Memory path (with lazy TTL cleanup)
++        # Same explicit profile expiry applies to either storage backend.
+         if user_id in self.memory_store:
+-            session = self.memory_store[user_id]
+-
+-            # Check TTL (lazy cleanup)
+-            created_at = session.get("created_at")
+-            if created_at:
+-                # Parse ISO format datetime string
+-                try:
+-                    if isinstance(created_at, str):
+-                        created_dt = datetime.fromisoformat(created_at)
+-                    else:
+-                        # Already datetime object
+-                        created_dt = created_at
+-
+-                    if datetime.now() - created_dt > timedelta(
+-                        seconds=self.ttl_seconds
+-                    ):
+-                        # TTL expired → delete and return default
+-                        del self.memory_store[user_id]
+-                        logger.debug(f"Session expired for user {user_id}")
+-                        return self._default_session(user_id)
+-                except (ValueError, TypeError) as e:
+-                    logger.warning(f"Invalid created_at format for user {user_id}: {e}")
+-                    # Invalid format → treat as expired
++            session = self._normalize(user_id, self.memory_store[user_id])
++            if session.get("created_at") != self.memory_store[user_id].get("created_at"):
++                if session.get("profile"):
++                    self.memory_store[user_id] = deepcopy(session)
++                else:
+                     del self.memory_store[user_id]
+-                    return self._default_session(user_id)
+-
+             return session
+-
+-        # Not found → return default
+         return self._default_session(user_id)
++
++    @staticmethod
++    def _now() -> datetime:
++        return datetime.now(timezone.utc)
++
++    @staticmethod
++    def _timestamp(value: Any) -> datetime:
++        parsed = datetime.fromisoformat(value) if isinstance(value, str) else value
++        if not isinstance(parsed, datetime):
++            raise ValueError("invalid session timestamp")
++        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
++
++    def _expired(self, value: Any, now: datetime, legacy_local: bool = False) -> bool:
++        try:
++            parsed = datetime.fromisoformat(value) if isinstance(value, str) else value
++            if legacy_local and isinstance(parsed, datetime) and parsed.tzinfo is None:
++                # Baseline created_at was written with datetime.now(), in local time.
++                parsed = parsed.astimezone(timezone.utc)
++            elapsed = (now - self._timestamp(parsed)).total_seconds()
++            return elapsed < 0 or elapsed >= self.ttl_seconds
++        except (TypeError, ValueError, OverflowError):
++            return True
++
++    def _normalize(self, user_id: int, stored: Any) -> dict:
++        now = self._now()
++        if not isinstance(stored, dict):
++            return self._default_session(user_id)
++        session = deepcopy(stored)
++        profile = session.get("profile")
++        has_profile = isinstance(profile, dict) and bool(profile)
++        profile_expired = has_profile and self._expired(profile.get("set_at_iso"), now)
++        session_expired = "created_at" in session and self._expired(session["created_at"], now, legacy_local=True)
++        if profile_expired:
++            session["profile"] = {}
++            session["rag_fallback_streak"] = 0
++            session["diagnostics_state"] = {}
++            session["active_ticket_uuid"] = None
++        if session_expired:
++            # A newly entered profile must survive an older session window.
++            fresh = self._default_session(user_id)
++            if has_profile and not profile_expired:
++                fresh["profile"] = session["profile"]
++            session = fresh
++        session.setdefault("profile", {})
++        session.setdefault("diagnostics_state", {})
++        session.setdefault("rag_fallback_streak", 0)
++        session.setdefault("active_ticket_uuid", None)
++        return session
++
++    @_serialized_event
++    async def set_profile(self, user_id: int, role: str, department: str) -> dict:
++        """Record explicit input; this alone starts/refreshes the profile TTL."""
++        if not isinstance(role, str) or not isinstance(department, str):
++            raise ValueError("role and department must be strings")
++        session = await self.get_session(user_id)
++        session["profile"] = {"role": role, "department": department,
++                              "set_at_iso": self._now().isoformat()}
++        await self.set_session(user_id, session)
++        return session
++
++    @_serialized_event
++    async def record_rag_fallback(self, user_id: int) -> dict:
++        """Count only a confirmed low-score RAG event, never diagnostics/LLM switches."""
++        session = await self.get_session(user_id)
++        session["rag_fallback_streak"] += 1
++        await self.set_session(user_id, session)
++        return session
++
++    @_serialized_event
++    async def record_rag_success(self, user_id: int) -> dict:
++        session = await self.get_session(user_id)
++        session["rag_fallback_streak"] = 0
++        await self.set_session(user_id, session)
++        return session
++
++    @_serialized_event
++    async def record_ticket_created(self, user_id: int) -> dict:
++        """Clear the streak and active operation only on confirmed creation."""
++        session = await self.get_session(user_id)
++        session["rag_fallback_streak"] = 0
++        session["active_ticket_uuid"] = None
++        await self.set_session(user_id, session)
++        return session
+ 
+     async def set_session(self, user_id: int, session: Dict[str, Any]) -> None:
+         """
+@@ -125,13 +210,29 @@
+             user_id: Telegram user ID
+             session: Session data dictionary
+         """
+-        # Add created_at if missing
++        session = deepcopy(session)
++        # TTL zero means immediate expiry, not invalid Redis SETEX 0.
++        if self.ttl_seconds == 0:
++            self.memory_store.pop(user_id, None)
++            if self.use_redis and self.redis_client:
++                try:
++                    self.redis_client.delete(f"session:{user_id}")
++                except Exception:
++                    logger.error("Redis expiry failed")
++            return
+         if "created_at" not in session:
+-            session["created_at"] = datetime.now().isoformat()
++            session["created_at"] = self._now().isoformat()
++        session.setdefault("profile", {})
++        session.setdefault("diagnostics_state", {})
++        session.setdefault("rag_fallback_streak", 0)
++        session.setdefault("active_ticket_uuid", None)
+ 
+         # Ensure created_at is string for JSON serialization
+         if isinstance(session.get("created_at"), datetime):
+-            session["created_at"] = session["created_at"].isoformat()
++            created = session["created_at"]
++            # Baseline accepts naive local datetime objects as well as strings.
++            # Convert via local timezone, never attach UTC to a local wall time.
++            session["created_at"] = created.astimezone(timezone.utc).isoformat()
+ 
+         # Redis path
+         if self.use_redis and self.redis_client:
+@@ -141,7 +242,7 @@
+                 )
+                 return
+             except Exception as e:
+-                logger.error(f"Redis set error: {e}. Falling back to memory.")
++                logger.error("Redis write failed; using process-local memory")
+                 # Fall through to memory
+ 
+         # Memory path
+@@ -162,7 +263,11 @@
+         """
+         return {
+             "user_id": user_id,
+-            "created_at": datetime.now().isoformat(),
++            "created_at": self._now().isoformat(),
++            "profile": {},
++            "diagnostics_state": {},
++            "rag_fallback_streak": 0,
++            "active_ticket_uuid": None,
+         }
+ 
+     def get_active_users_count(self) -> int:
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/utils/metrics.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/utils/metrics.py
+@@ -1,37 +1,90 @@
+-"""
+-Prometheus metrics definitions for bot monitoring.
++"""Prometheus metrics in the existing default registry.
+ 
+-Metrics:
+-- bot_query_latency_seconds: Query processing time (Histogram)
+-- bot_active_users: Active user sessions (Gauge)
+-- bot_errors_total: Total errors by type (Counter)
++register_metrics(registry) returns an isolated/reusable collector mapping without
++rebinding REGISTRY. Module constants retain the baseline names. New adapters use
++LLM_REQUESTS.labels(provider='gigachat'|'yandexgpt', status='success'|'failure'),
++RAG_SCORE.observe(similarity), FALLBACK_TOTAL.labels(type='rag'|'llm'),
++TICKETS_CREATED and TICKETS_FAILED. No request-specific labels are accepted.
+ """
+ 
+-from prometheus_client import Counter, Histogram, Gauge
++from threading import RLock
+ 
+-# Query latency metric (Histogram)
+-QUERY_LATENCY = Histogram(
+-    "bot_query_latency_seconds",
+-    "Query processing time from receipt to response",
+-    ["mode"],
+-    buckets=[
+-        0.1,
+-        0.5,
+-        1.0,
+-        2.0,
+-        5.0,
+-        10.0,
+-        30.0,
+-        60.0,
+-    ],  # Buckets for latency distribution
+-)
++from prometheus_client import REGISTRY, Counter, Histogram, Gauge
+ 
+-# Active users metric (Gauge)
+-ACTIVE_USERS = Gauge("bot_active_users", "Number of active user sessions")
++_registration_lock = globals().get("_registration_lock", RLock())
+ 
+-# Error count metric (Counter)
+-ERROR_COUNT = Counter(
+-    "bot_errors_total", "Total number of errors by type", ["error_type"]
+-)
+ 
+-# Note: TOKEN_USAGE metric отложен на Week 2 (требует state management для cumulative metrics)
++class _BoundedCounter:
++    """Reject new label values outside the documented finite domains."""
++
++    def __init__(self, collector):
++        self._collector = collector
++        self._labelnames = collector._labelnames
++
++    def __getattr__(self, name):
++        return getattr(self._collector, name)
++
++    def labels(self, *labelvalues, **labelkwargs):
++        if labelvalues and labelkwargs:
++            raise ValueError("use positional or keyword labels, not both")
++        values = dict(zip(self._labelnames, labelvalues)) if labelvalues else labelkwargs
++        if set(values) != set(self._labelnames) or len(labelvalues) not in (0, len(self._labelnames)):
++            raise ValueError("invalid metric labels")
++        domains = {
++            "provider": {"gigachat", "yandexgpt"},
++            "status": {"success", "failure"},
++            "type": {"rag", "llm"},
++        }
++        if any(not isinstance(value, str) or value not in domains[key] for key, value in values.items()):
++            raise ValueError("metric label value is outside its bounded domain")
++        return self._collector.labels(*labelvalues, **labelkwargs)
++
++
++def register_metrics(registry=REGISTRY) -> dict:
++    """Register once per supplied registry; safe on repeated import/reload.
++
++    Existing same-name collectors must have the expected kind/label schema;
++    unrelated collectors are never unregistered. This compatibility check uses
++    the prometheus client's registered-name index (there is no public lookup).
++    """
++    definitions = (
++        ("QUERY_LATENCY", Histogram, "bot_query_latency_seconds", "Query processing time from receipt to response", ("mode",), {"buckets": [0.1, 0.5, 1, 2, 5, 10, 30, 60]}),
++        ("ACTIVE_USERS", Gauge, "bot_active_users", "Number of active user sessions", (), {}),
++        ("ERROR_COUNT", Counter, "bot_errors_total", "Total number of errors by type", ("error_type",), {}),
++        ("LLM_REQUESTS", _BoundedCounter, "llm_requests_total", "LLM provider attempts by outcome", ("provider", "status"), {}),
++        ("RAG_SCORE", Histogram, "rag_score", "Normalized RAG similarity", (), {"buckets": [0, 0.2, 0.4, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]}),
++        ("FALLBACK_TOTAL", _BoundedCounter, "fallback_total", "Fallback events by kind", ("type",), {}),
++        ("TICKETS_CREATED", Counter, "tickets_created_total", "Successfully created tickets", (), {}),
++        ("TICKETS_FAILED", Counter, "tickets_failed_total", "Tickets failing all delivery attempts", (), {}),
++    )
++    result = {}
++    with _registration_lock:
++        for key, kind, name, help_text, labels, options in definitions:
++            bounded = kind is _BoundedCounter
++            actual_kind = Counter if bounded else kind
++            existing = registry._names_to_collectors.get(name)
++            if existing is not None:
++                expected_type = "counter" if issubclass(actual_kind, Counter) else "histogram" if kind is Histogram else "gauge"
++                if existing._type != expected_type or tuple(existing._labelnames) != labels:
++                    raise ValueError(f"incompatible registered metric: {name}")
++                if bounded:
++                    if not hasattr(existing, "_hr_bounded_facade"):
++                        existing._hr_bounded_facade = _BoundedCounter(existing)
++                    result[key] = existing._hr_bounded_facade
++                else:
++                    result[key] = existing
++                continue
++            collector = actual_kind(name, help_text, labels, registry=registry, **options)
++            if bounded:
++                collector._hr_bounded_facade = _BoundedCounter(collector)
++            result[key] = collector._hr_bounded_facade if bounded else collector
++    # Publish bounded zero-valued families before the first application event.
++    for provider in ("gigachat", "yandexgpt"):
++        for status in ("success", "failure"):
++            result["LLM_REQUESTS"].labels(provider=provider, status=status)
++    for event_type in ("rag", "llm"):
++        result["FALLBACK_TOTAL"].labels(type=event_type)
++    return result
++
++
++globals().update(register_metrics())

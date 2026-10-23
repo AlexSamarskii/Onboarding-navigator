@@ -1,0 +1,16 @@
+{
+  "selected_variant": "C",
+  "user_approved": true,
+  "backup": "/tmp/b2_backup_20261023T201300Z.tar.gz",
+  "backup_sha256": "f252f636efb0dac6848f90b333e2cbf05bbe465126d8d5ad1348246d0b9bad4c",
+  "files_verified_before_intentional_metadata_changes": 1346,
+  "internal_link_targets_preserved": 300,
+  "root_inode_preserved": true,
+  "skills_directories": 9,
+  "skills_lock_unchanged": true,
+  "claude_unchanged": true,
+  "agent_is_real": true,
+  "agents_absent": true,
+  "gitignore_applied_sha256": "b203ff024dd5734b79159f7c2da7cb6752ae7795799ecc91cbb2891af74b5ffb",
+  "scope": "No artifact content removed; README and ignore updated explicitly. B1/B3 not started."
+}

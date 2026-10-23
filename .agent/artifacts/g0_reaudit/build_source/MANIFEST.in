@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+recursive-include telegram_rag_bot/templates *.yaml *.md *.example
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * *.swp
+recursive-exclude * .DS_Store
+

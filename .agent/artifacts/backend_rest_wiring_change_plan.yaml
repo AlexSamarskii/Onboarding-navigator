@@ -1,0 +1,50 @@
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/main.py
+  action: adapt
+  reason: Bind external LocalFAISSProvider subclass through rag_factory.vectorstore_provider
+    before first create_chain; configure coordinator/health/provider observers, root
+    adapters and command registration; retain Router and factory code.
+  linked_ac:
+  - AC-F02
+  - AC-F03
+  - AC-F04
+  - AC-N03
+  - AC-N08
+  - AC-N09
+  - AC-C02
+  - AC-C03
+  - AC-U01
+  - AC-U02
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/handlers.py
+  action: adapt
+  reason: 'Effort L: 47 Cyrillic AST literal expressions (1 docstring), verified source==installed;
+    locale migration plus context-preserving U01 rendering, diagnostics, profile/counter/reindex/status,
+    no user ID or response-content logs.'
+  linked_ac:
+  - AC-S1
+  - AC-S2
+  - AC-S3
+  - AC-S4
+  - AC-S5
+  - AC-S6
+  - AC-S7
+  - AC-S8
+  - AC-F01
+  - AC-F03
+  - AC-F04
+  - AC-C05
+  - AC-C06
+  - AC-C07
+  - AC-U01
+  - AC-U02
+  - AC-O01
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/pyproject.toml
+  action: adapt
+  reason: Configure line coverage target>=78 and explicit justified omissions plus
+    test source import path; retain version>=3.11, dependencies, license and attribution.
+  linked_ac:
+  - AC-N10
+  - AC-C01
+  - AC-C05
+  owner_role: backend-rest

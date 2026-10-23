@@ -1,0 +1,153 @@
+{
+  "agent": "Reviewer",
+  "status": "failed",
+  "stage": "G2/backend-rest-adapters",
+  "iteration": 1,
+  "verdict": "reject",
+  "counts": {
+    "blocker": 0,
+    "major": 1,
+    "minor": 2
+  },
+  "comments": [
+    {
+      "file": "workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py",
+      "line": 90,
+      "severity": "major",
+      "text": "HRFAISSProvider.load_index is decorated by lru_cache outside the publication lock. The body releases the lock before functools inserts its result. A concurrent save can publish new index and clear both caches, after which the suspended reader inserts the OLD facade back into the HR cache. New reads then serve stale content despite completed save. Deterministic scheduling test reproduces old != new. Acquire publication lock outside cached lookup/insertion while retaining load_index.cache_clear compatibility; rerun regression.",
+      "linked_ac": [
+        "AC-F02",
+        "AC-C03"
+      ],
+      "evidence": ".agent/artifacts/backend_rest_adapters_checks/reviewer/test_publication_race.py:44"
+    },
+    {
+      "file": "integrations/ticketing.py",
+      "line": 1,
+      "severity": "minor",
+      "text": "Operational limitation explicitly documented: dedupe and remembered results are client/process-local; cross-pod idempotency requires receiver-side UUID handling or later deployment coordination. Query redaction is heuristic, not a privacy guarantee. No current in-scope functional defect asserted.",
+      "linked_ac": [
+        "AC-F05",
+        "AC-C05"
+      ]
+    },
+    {
+      "file": "workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py",
+      "line": 147,
+      "severity": "minor",
+      "text": "Operational limitation explicitly documented: publication/rollback is process-local and not crash-proof; trusted source files and a single reindex writer are required until infra supplies coordination. No protected core rewrite requested.",
+      "linked_ac": [
+        "AC-F02",
+        "AC-C03"
+      ]
+    }
+  ],
+  "ac_check": [
+    {
+      "ac": "AC-U01",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-U02",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-S6",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-S7",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-S4",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-F02",
+      "status": "fail",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-F03",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-F05",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-N02",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-N07",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-N11",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-O01",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-O02",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-C03",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-C04",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-C05",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-C06",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    },
+    {
+      "ac": "AC-C07",
+      "status": "ok",
+      "scope": "isolated adapter contract only; handlers/live performance not assessed"
+    }
+  ],
+  "verification": {
+    "isolated_suite": "50 passed; independent deterministic publication-race regression 1 failed",
+    "protected_hashes": "42/42 unchanged",
+    "patch_paths": "exactly seven authorized additions",
+    "reverse_patch_check": "passed",
+    "network": "fakes only; no bot/handlers/ConfigLoader/live HTTP/Redis/LLM",
+    "user_clarifications": [
+      "Citation uses exact whole nonempty allowed-source page_content; unknown/missing/empty => None.",
+      "At most 3 POSTs; pauses 1/2 before attempts2/3; no sleep after failure3."
+    ]
+  },
+  "pre_freeze_history": [
+    "Coordinator multi-mode rollback concern raised during construction; fixed before formal frozen review1, then tested."
+  ],
+  "artifact_ref": ".agent/artifacts/backend_rest_adapters_review_1.json",
+  "questions": []
+}

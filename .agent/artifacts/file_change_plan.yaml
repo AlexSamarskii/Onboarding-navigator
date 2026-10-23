@@ -1,0 +1,524 @@
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/langchain_adapter/rag_chains.py
+  action: keep
+  reason: Protected RAGChainFactory; source matches installed hash; source/page_content
+    available in response.context. No edit.
+  linked_ac:
+  - AC-C03
+  - AC-U01
+  - AC-N03
+  owner_role: backend
+- path: workspace/telegram-rag-bot/orchestrator/router.py
+  action: keep
+  reason: Installed protected fallback core; no edit/no copy; dependency used unchanged.
+  linked_ac:
+  - AC-C02
+  - AC-N03
+  owner_role: backend
+- path: workspace/telegram-rag-bot/orchestrator/retrieval/async_faiss.py
+  action: keep
+  reason: Installed protected retrieval; no edit; async_mode false avoids existing
+    constructor mismatch.
+  linked_ac:
+  - AC-C03
+  owner_role: backend
+- path: workspace/telegram-rag-bot/telegram_rag_bot/langchain_adapter/rag_chains.py
+  action: keep
+  reason: Installed audit evidence stays unchanged; actual editable app source is
+    separate checkout.
+  linked_ac:
+  - AC-C03
+  - AC-U01
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/vectorstore/local_faiss.py
+  action: keep
+  reason: Reuse public load_index/save_index/cache-clear behavior by subclass composition;
+    no base edits.
+  linked_ac:
+  - AC-C03
+  - AC-F02
+  - AC-S6
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/embeddings
+  action: keep
+  reason: Reuse installed-compatible configured embedding providers and batch interfaces;
+    preserve attribution.
+  linked_ac:
+  - AC-C01
+  - AC-C03
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/__main__.py
+  action: keep
+  reason: Existing CLI entry points, METADATA version and backward compatibility;
+    runtime app wiring in main.
+  linked_ac:
+  - AC-C01
+  - AC-F04
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/main.py
+  action: adapt
+  reason: Bind external LocalFAISSProvider subclass through rag_factory.vectorstore_provider
+    before first create_chain; configure coordinator/health/provider observers, root
+    adapters and command registration; retain Router and factory code.
+  linked_ac:
+  - AC-F02
+  - AC-F03
+  - AC-F04
+  - AC-N03
+  - AC-N08
+  - AC-N09
+  - AC-C02
+  - AC-C03
+  - AC-U01
+  - AC-U02
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/handlers.py
+  action: adapt
+  reason: 'Effort L: 47 Cyrillic AST literal expressions (1 docstring), verified source==installed;
+    locale migration plus context-preserving U01 rendering, diagnostics, profile/counter/reindex/status,
+    no user ID or response-content logs.'
+  linked_ac:
+  - AC-S1
+  - AC-S2
+  - AC-S3
+  - AC-S4
+  - AC-S5
+  - AC-S6
+  - AC-S7
+  - AC-S8
+  - AC-F01
+  - AC-F03
+  - AC-F04
+  - AC-C05
+  - AC-C06
+  - AC-C07
+  - AC-U01
+  - AC-U02
+  - AC-O01
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/mode_loader.py
+  action: adapt
+  reason: 'Effort M: 6 Cyrillic AST literal expressions; move parser aliases/UI to
+    YAML, preserve greeting parsing and old files.* contract; validate proposed source_titles/sources/diagnostics_file/plans_directory
+    extensions.'
+  linked_ac:
+  - AC-S8
+  - AC-F02
+  - AC-C04
+  - AC-C07
+  - AC-U02
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/config_loader.py
+  action: adapt
+  reason: Validate additive YAML score/ticketing/i18n settings, preserve env substitution
+    and modes.directory; no sensitive file access or secret values.
+  linked_ac:
+  - AC-C04
+  - AC-C05
+  - AC-C07
+  - AC-S6
+  - AC-F05
+  - AC-U02
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/utils/session_manager.py
+  action: adapt
+  reason: Preserve public get_session/set_session; independent explicit profile expiry24h,
+    mode/diagnostics state, RAG-only counter, ticket dedupe; Redis TTL cannot silently
+    slide profile TTL.
+  linked_ac:
+  - AC-S4
+  - AC-S7
+  - AC-F01
+  - AC-U02
+  - AC-C05
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/utils/metrics.py
+  action: adapt
+  reason: Reuse existing Prometheus registry/metrics; add llm_requests_total, rag_score
+    histogram, fallback_total type rag|llm, tickets_created_total and tickets_failed_total,
+    bounded labels.
+  linked_ac:
+  - AC-N04
+  - AC-N05
+  - AC-N06
+  - AC-N07
+  - AC-N11
+  - AC-N01
+  - AC-N02
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py
+  action: add
+  reason: 'Proposed external LocalFAISSProvider subclass/facade and BaseRetriever:
+    native single scored search, gate before LLM, unchanged source/page_content; multi-source
+    indexing coordinator and provider observation delegates; no RAG rewrite. Preserve
+    load_index.cache_clear and invalidate both inherited and facade caches after save/delete;
+    verify reindex freshness.'
+  linked_ac:
+  - AC-S6
+  - AC-F02
+  - AC-F03
+  - AC-N02
+  - AC-N03
+  - AC-N04
+  - AC-N05
+  - AC-N06
+  - AC-C02
+  - AC-C03
+  - AC-U01
+  - AC-O01
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py
+  action: add
+  reason: Proposed citation adapter on exact returned context; allowlist source title,
+    validate verbatim quote; no second retrieval or fabricated chunk_id.
+  linked_ac:
+  - AC-U01
+  - AC-S6
+  - AC-C03
+  - AC-C07
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py
+  action: add
+  reason: Proposed deterministic YAML graph execution/validation all paths; explicit
+    escalation at every step, no commands/credential prompts or RAG counter mutation.
+  linked_ac:
+  - AC-U02
+  - AC-S1
+  - AC-S7
+  - AC-C04
+  - AC-C05
+  - AC-C06
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/i18n.py
+  action: add
+  reason: Proposed RU YAML key lookup, interpolation and legacy parser markers; generic
+    locale loading, no EN content.
+  linked_ac:
+  - AC-C07
+  - AC-U01
+  - AC-U02
+  owner_role: backend
+- path: integrations/__init__.py
+  action: add
+  reason: Proposed root application package; Docker/local deployment root is explicit
+    import path, not installed dependency folder.
+  linked_ac:
+  - AC-F05
+  owner_role: backend
+- path: integrations/ticketing.py
+  action: add
+  reason: Proposed root HTTP webhook adapter; exact fields UUID/hash/UTC, notify_chat_id
+    optional,3 attempts pauses1/2/4 and5s timeout, redacted errors/dedupe.
+  linked_ac:
+  - AC-S7
+  - AC-F05
+  - AC-N07
+  - AC-N11
+  - AC-C05
+  owner_role: backend
+- path: analytics/__init__.py
+  action: add
+  reason: Proposed root application package; runtime log is mounted as file in separate
+    data volume so Python package is not hidden.
+  linked_ac:
+  - AC-S4
+  - AC-O02
+  owner_role: backend
+- path: analytics/writer.py
+  action: add
+  reason: Proposed root redaction and JSONL writer, mandatory missing_plan, ordinary
+    unanswered optional; runtime data not staged/committed, no U04 editor report.
+  linked_ac:
+  - AC-S4
+  - AC-O02
+  - AC-C05
+  owner_role: backend
+- path: config/config.yaml
+  action: add
+  reason: 'Proposed nonsensitive runtime YAML: threshold, mode directory, first-available
+    provider order, adapters/i18n/whitelist settings; only env placeholders for secrets,
+    human provisioning.'
+  linked_ac:
+  - AC-C04
+  - AC-C05
+  - AC-C07
+  - AC-S6
+  - AC-S7
+  - AC-F05
+  - AC-N03
+  owner_role: backend
+- path: config/i18n/ru.yaml
+  action: add
+  reason: Proposed all RU UI/system strings, diagnostics questions, citation unavailable
+    and legacy loader parsing aliases; no EN locale.
+  linked_ac:
+  - AC-C07
+  - AC-U01
+  - AC-U02
+  owner_role: backend
+- path: config/modes/it_support/mode.yaml
+  action: adapt
+  reason: Добавить optional source_titles и diagnostics_file, сохранить name/display_name/description/enabled/files/timeout_seconds
+    для обратной совместимости с baseline ModeLoader
+  linked_ac:
+  - AC-S8
+  - AC-F02
+  - AC-C04
+  - AC-U01
+  - AC-U02
+  owner_role: data
+- path: config/modes/it_support/system_prompt.md
+  action: adapt
+  reason: Уточнить под HR-IT-поддержку, сохранить структуру
+  linked_ac:
+  - AC-S1
+  - AC-C04
+  - AC-U01
+  owner_role: data
+- path: config/modes/it_support/faq.md
+  action: adapt
+  reason: 'Расширить 3 контрольными фактами AC-S1: VPN, корпоративная почта, Git-доступ'
+  linked_ac:
+  - AC-S1
+  - AC-F02
+  - AC-C04
+  - AC-U01
+  owner_role: data
+- path: config/modes/it_support/diagnostics.yaml
+  action: add
+  reason: Proposed VPN/mail graph >=2 terminal branches each, <=3 clarification questions
+    per path, FAQ refs and RU keys; no scripts or dynamic actions.
+  linked_ac:
+  - AC-U02
+  - AC-S1
+  - AC-S7
+  - AC-C04
+  owner_role: data
+- path: config/modes/benefits
+  action: add
+  reason: Proposed bundle with exactly mode.yaml, system_prompt.md, faq.md; approved
+    anonymized control facts and allowlisted source titles.
+  linked_ac:
+  - AC-S2
+  - AC-S8
+  - AC-F02
+  - AC-U01
+  - AC-C04
+  owner_role: data
+- path: config/modes/learning
+  action: add
+  reason: Proposed bundle with exactly mode.yaml, system_prompt.md, faq.md; approved
+    anonymized control facts and allowlisted source titles.
+  linked_ac:
+  - AC-S3
+  - AC-S8
+  - AC-F02
+  - AC-U01
+  - AC-C04
+  owner_role: data
+- path: config/modes/culture
+  action: add
+  reason: Proposed bundle with exactly mode.yaml, system_prompt.md, faq.md and policies/example.md;
+    source_titles and approved anonymized policies.
+  linked_ac:
+  - AC-S5
+  - AC-S8
+  - AC-F02
+  - AC-U01
+  - AC-C04
+  owner_role: data
+- path: config/modes/onboarding_plan
+  action: add
+  reason: Proposed bundle with exactly mode.yaml, system_prompt.md, faq.md and plans/developer.md,
+    plans/developer__engineering.md, plans/default.md; anonymized fixtures, path-safe
+    role resolution.
+  linked_ac:
+  - AC-S4
+  - AC-S8
+  - AC-F01
+  - AC-F02
+  - AC-C04
+  owner_role: data
+- path: workspace/telegram-rag-bot-src/pyproject.toml
+  action: adapt
+  reason: Configure line coverage target>=78 and explicit justified omissions plus
+    test source import path; retain version>=3.11, dependencies, license and attribution.
+  linked_ac:
+  - AC-N10
+  - AC-C01
+  - AC-C05
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/tests
+  action: keep
+  reason: Existing baseline tests remain unchanged; new acceptance tests verify AC
+    rather than replacing existing expected behavior.
+  linked_ac:
+  - AC-N10
+  - AC-C01
+  - AC-C02
+  - AC-C03
+  owner_role: backend
+- path: workspace/telegram-rag-bot-src/tests/test_hr_acceptance.py
+  action: add
+  reason: Proposed 12 FAQ pairs, profiles/TTL/missing_plan, score boundaries, commands/admin,
+    YAML mode and diagnostics all paths, U01 positives12/12 and negatives, i18n AST/no
+    EN.
+  linked_ac:
+  - AC-S1
+  - AC-S2
+  - AC-S3
+  - AC-S4
+  - AC-S5
+  - AC-S6
+  - AC-S7
+  - AC-S8
+  - AC-F01
+  - AC-F02
+  - AC-F03
+  - AC-F04
+  - AC-C04
+  - AC-C05
+  - AC-C06
+  - AC-C07
+  - AC-U01
+  - AC-U02
+  - AC-N10
+  owner_role: backend-rest
+- path: workspace/telegram-rag-bot-src/tests/test_hr_adapters.py
+  action: adapt
+  reason: 'B1 user-authorized exact test exception: baseline hashes from committed
+    JSON and importlib fallback, negative control; no runtime code changes'
+  linked_ac:
+  - AC-F05
+  - AC-N03
+  - AC-N04
+  - AC-N05
+  - AC-N06
+  - AC-N07
+  - AC-N11
+  - AC-C02
+  - AC-C03
+  - AC-O01
+  - AC-O02
+  - AC-U01
+  - AC-U02
+  - AC-N10
+  owner_role: release
+- path: tests/load/run_baseline.py
+  action: add
+  reason: Proposed load tooling per approved AC:100warmup,10RPS300s/3000offered,1000preselectedseed0
+    stratified measurements,1000chunks,2CPU4GBpod; separate Telegram end-to-end/retrieval
+    timing, failures+infinity, artifacts only result output. No live execution at
+    planning.
+  linked_ac:
+  - AC-N01
+  - AC-N02
+  owner_role: infra
+- path: Dockerfile
+  action: add
+  reason: Proposed product image builds source wheel and copies root integrations/analytics/config;
+    explicit root WORKDIR/PYTHONPATH; no secrets baked; health and metrics reuse.
+  linked_ac:
+  - AC-N08
+  - AC-C01
+  - AC-C05
+  owner_role: infra
+- path: .dockerignore
+  action: add
+  reason: 'Proposed explicit build context allowlist/exclusions: dependency audit
+    trees/build output/runtime generated data/credentials excluded, no sensitive contents
+    read.'
+  linked_ac:
+  - AC-N08
+  - AC-C05
+  owner_role: infra
+- path: deploy/k8s/deployment.yaml
+  action: add
+  reason: Proposed1pod2CPU4GB test deployment with Redis sessions/config mount, externally
+    human-provisioned env, existing health probe; data volume at /data and file binding
+    for analytics/unanswered.jsonl, not masking package.
+  linked_ac:
+  - AC-N09
+  - AC-N01
+  - AC-N02
+  - AC-C05
+  owner_role: infra
+- path: workspace/telegram-rag-bot-src/telegram_rag_bot/handlers_legacy.py
+  action: add
+  reason: User-approved legacy compatibility extraction; excluded from HR UI scan
+    and coverage
+  linked_ac:
+  - AC-C07
+  - AC-N10
+  owner_role: backend-rest
+- path: .gitignore
+  action: adapt
+  owner_role: release
+  linked_ac:
+  - AC-N08
+  - AC-N09
+  reason: User-authorized hygiene proposal; mutation gated on approval
+- path: deploy/build_config_overlay.py
+  action: add
+  owner_role: infra
+  linked_ac:
+  - AC-N08
+  - AC-N09
+  reason: 'User solution5: narrow build-time health port overlay, frozen repository
+    config unchanged.'
+- path: .agent/artifacts/release_notes.md
+  action: adapt
+  owner_role: docs
+  linked_ac:
+  - AC-C01
+  - AC-C06
+  reason: User-authorized Russian translation; commands/license/status unchanged
+- path: .agent/artifacts/README.delta.md
+  action: adapt
+  owner_role: docs
+  linked_ac:
+  - AC-C01
+  - AC-C06
+  reason: User-authorized Russian translation; commands/license/status unchanged
+- path: .agent/artifacts/CHANGELOG.md
+  action: adapt
+  owner_role: docs
+  linked_ac:
+  - AC-C01
+  - AC-C06
+  reason: User-authorized Russian translation; commands/license/status unchanged
+- path: .agent/artifacts/ATTRIBUTION.md
+  action: adapt
+  owner_role: docs
+  linked_ac:
+  - AC-C01
+  - AC-C06
+  reason: User-authorized Russian translation; commands/license/status unchanged
+- path: .agent
+  action: adapt
+  owner_role: release
+  linked_ac:
+  - AC-C06
+  reason: B2 structure-only migration; A/B/C choice pending, no artifact deletion
+    or implementation before approval.
+- path: .agents
+  action: adapt
+  owner_role: release
+  linked_ac:
+  - AC-C06
+  reason: B2 structure-only migration; A/B/C choice pending, no artifact deletion
+    or implementation before approval.
+- path: workspace/telegram-rag-bot-src/tests/data/protected_core_hashes.json
+  action: add
+  owner_role: release
+  linked_ac:
+  - AC-C02
+  - AC-C03
+  reason: B1 baseline constants copied from pre-change test, distribution versions
+    from metadata
+- path: .codex/config.toml
+  action: keep
+  owner_role: release
+  linked_ac:
+  - AC-C02
+  - AC-C03
+  reason: B3 read-only classification/proposal; index KEEP/UNSTAGE separately gated

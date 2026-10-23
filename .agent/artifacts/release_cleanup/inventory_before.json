@@ -1,0 +1,179 @@
+{
+  "created_at_utc": "2026-10-23T19:26:20.082853+00:00",
+  "project_root": "/Users/alesamarskij/projects/hr_bot",
+  "git_identity": {
+    "command": [
+      "git",
+      "rev-parse",
+      "--show-toplevel",
+      "--show-prefix",
+      "--git-dir"
+    ],
+    "exit_code": 0,
+    "stdout": "/Users/alesamarskij/projects\nhr_bot/\n/Users/alesamarskij/projects/.git\n",
+    "stderr": ""
+  },
+  "git_status_short_project": {
+    "command": [
+      "git",
+      "status",
+      "--short",
+      "--",
+      "."
+    ],
+    "exit_code": 0,
+    "stdout": {
+      "lines": [
+        "AM .codex/config.toml",
+        "AM workspace/README.md",
+        "?? .agent",
+        "?? .agents/",
+        "?? .dockerignore",
+        "?? .gitignore",
+        "?? AGENTS.md",
+        "?? CLAUDE.md",
+        "?? Dockerfile",
+        "?? analytics/",
+        "?? config/",
+        "?? deploy/",
+        "?? integrations/",
+        "?? skills-lock.json",
+        "?? tests/",
+        "?? workspace/multi-llm-orchestrator/",
+        "?? workspace/sirchatalot-reference/",
+        "?? workspace/telegram-rag-bot-src/",
+        "?? workspace/telegram-rag-bot/"
+      ],
+      "restricted_rows_omitted": 2
+    },
+    "stderr": ""
+  },
+  "git_ls_files_project": {
+    "command": [
+      "git",
+      "ls-files",
+      "--",
+      "."
+    ],
+    "exit_code": 0,
+    "stdout": {
+      "count": 2
+    },
+    "stderr": ""
+  },
+  "git_ls_files_all_count": 2,
+  "git_directories_maxdepth2": [],
+  "workspace_nested_git": [
+    "workspace/multi-llm-orchestrator/.git",
+    "workspace/sirchatalot-reference/.git"
+  ],
+  "workspace_listing": [
+    {
+      "name": "README.md",
+      "kind": "file",
+      "mode": "-rw-r--r--",
+      "mtime": "2026-10-22T22:08:02.520548+00:00"
+    },
+    {
+      "name": "multi-llm-orchestrator",
+      "kind": "directory",
+      "mode": "drwxr-xr-x",
+      "mtime": "2026-10-22T22:05:27.377742+00:00"
+    },
+    {
+      "name": "sirchatalot-reference",
+      "kind": "directory",
+      "mode": "drwxr-xr-x",
+      "mtime": "2026-10-22T22:05:39.650227+00:00"
+    },
+    {
+      "name": "telegram-rag-bot",
+      "kind": "directory",
+      "mode": "drwxr-xr-x",
+      "mtime": "2026-10-22T22:01:36.154716+00:00"
+    },
+    {
+      "name": "telegram-rag-bot-src",
+      "kind": "directory",
+      "mode": "drwxr-xr-x",
+      "mtime": "2026-10-22T22:43:51.927479+00:00"
+    }
+  ],
+  "usage": {
+    "workspace/README.md": {
+      "bytes": 361
+    },
+    "workspace/multi-llm-orchestrator": {
+      "bytes": 2387145,
+      "allocated_bytes": 2736128,
+      "files": 143,
+      "restricted_paths_pruned": true
+    },
+    "workspace/sirchatalot-reference": {
+      "bytes": 848070,
+      "allocated_bytes": 1069056,
+      "files": 94,
+      "restricted_paths_pruned": true
+    },
+    "workspace/telegram-rag-bot": {
+      "bytes": 153792423,
+      "allocated_bytes": 176951296,
+      "files": 7741,
+      "restricted_paths_pruned": true
+    },
+    "workspace/telegram-rag-bot-src": {
+      "bytes": 1223712,
+      "allocated_bytes": 1478656,
+      "files": 103,
+      "restricted_paths_pruned": true
+    },
+    ".agent/artifacts": {
+      "bytes": 3988706,
+      "allocated_bytes": 8466432,
+      "files": 1277,
+      "restricted_paths_pruned": true
+    },
+    ".agent/playbooks": {
+      "bytes": 4984,
+      "allocated_bytes": 16384,
+      "files": 4,
+      "restricted_paths_pruned": true
+    },
+    ".agent/prompts": {
+      "bytes": 4182,
+      "allocated_bytes": 16384,
+      "files": 4,
+      "restricted_paths_pruned": true
+    },
+    ".agent/roles": {
+      "bytes": 16045,
+      "allocated_bytes": 45056,
+      "files": 11,
+      "restricted_paths_pruned": true
+    },
+    ".agent/skills": {
+      "bytes": 393624,
+      "allocated_bytes": 495616,
+      "files": 43,
+      "restricted_paths_pruned": true
+    },
+    ".venv": {
+      "bytes": 180226846,
+      "allocated_bytes": 207798272,
+      "files": 9684,
+      "restricted_paths_pruned": true
+    }
+  },
+  "non_env_special_paths": [
+    "workspace/telegram-rag-bot/grpc/_cython/_credentials/roots.pem",
+    "workspace/telegram-rag-bot/certifi/cacert.pem",
+    ".venv/lib/python3.13/site-packages/grpc/_cython/_credentials/roots.pem",
+    ".venv/lib/python3.13/site-packages/certifi/cacert.pem"
+  ],
+  "restricted_scan": {
+    "status": "not_run",
+    "reason": "Higher-priority restriction forbids access to .env/.env.* and .idea; no content or secret classification performed; no deletion authorized."
+  },
+  "agent_symlink": ".agents",
+  "errors": []
+}

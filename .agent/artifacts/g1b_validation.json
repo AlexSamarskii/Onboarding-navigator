@@ -1,0 +1,25 @@
+{
+  "status": "ok",
+  "plan_entries": 37,
+  "adapt_entries": 8,
+  "reuse_entries": 13,
+  "adapt_coverage": "8/8",
+  "ac_coverage": "35/35",
+  "protected_unchanged": {
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/langchain_adapter/rag_chains.py": true,
+    "workspace/telegram-rag-bot/telegram_rag_bot/langchain_adapter/rag_chains.py": true,
+    "workspace/telegram-rag-bot/orchestrator/router.py": true,
+    "workspace/telegram-rag-bot/orchestrator/retrieval/async_faiss.py": true
+  },
+  "u01_decision": "A; active, source+page_content; no native chunk_id",
+  "i18n": {
+    "handlers": 47,
+    "mode_loader": 6,
+    "effort": {
+      "handlers": "L",
+      "mode_loader": "M"
+    }
+  },
+  "implementation_started": false,
+  "plan_approved": false
+}

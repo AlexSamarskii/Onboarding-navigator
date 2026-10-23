@@ -1,0 +1,254 @@
+{
+  "scope": "G0",
+  "repo_path": "workspace/telegram-rag-bot",
+  "artifact_kind": "Installed PyPI target tree, including dependencies; not source checkout",
+  "package": {
+    "name": "telegram-rag-bot",
+    "version": "0.14.6",
+    "requires_python": ">=3.11",
+    "license": "MIT",
+    "evidence": "workspace/telegram-rag-bot/telegram_rag_bot-0.14.6.dist-info/METADATA"
+  },
+  "stack": [
+    "Python >=3.11",
+    "python-telegram-bot 21.x",
+    "asyncio/aiohttp",
+    "LangChain + langchain-classic",
+    "multi-llm-orchestrator 0.9.1",
+    "GigaChat/YandexGPT",
+    "FAISS/OpenSearch",
+    "PyYAML/Pydantic",
+    "Redis or memory sessions",
+    "Prometheus/python-json-logger"
+  ],
+  "dependencies": {
+    "declared": [
+      "multi-llm-orchestrator[langchain,retrieval]<1.0.0,>=0.9.0",
+      "langchain>=1.0",
+      "langchain-classic<2.0,>=1.0",
+      "langchain-core>=0.1.0",
+      "langchain-community>=0.0.1",
+      "langchain-text-splitters>=0.0.1",
+      "python-telegram-bot<22.0,>=21.0",
+      "faiss-cpu>=1.7.0",
+      "pyyaml>=6.0",
+      "pydantic>=2.0",
+      "redis>=5.0",
+      "httpx>=0.24.0",
+      "opensearch-py>=2.3.0",
+      "aiohttp>=3.9.0",
+      "python-json-logger>=2.0.0",
+      "prometheus-client<0.20.0,>=0.19.0",
+      "pytest>=7.4.0; extra == \"dev\"",
+      "pytest-asyncio>=0.21.0; extra == \"dev\"",
+      "pytest-cov>=4.1.0; extra == \"dev\"",
+      "black>=23.0.0; extra == \"dev\"",
+      "ruff>=0.1.0; extra == \"dev\"",
+      "mypy>=1.5.0; extra == \"dev\"",
+      "sentence-transformers>=2.2.0; extra == \"local\""
+    ],
+    "evidence": "workspace/telegram-rag-bot/telegram_rag_bot-0.14.6.dist-info/METADATA"
+  },
+  "entry_points": [
+    {
+      "command": "telegram-bot / telegram-rag-bot",
+      "target": "telegram_rag_bot.__main__:main",
+      "evidence": "workspace/telegram-rag-bot/telegram_rag_bot-0.14.6.dist-info/entry_points.txt"
+    },
+    {
+      "command": "python3.13 -B -m telegram_rag_bot --help|version|run|rebuild",
+      "target": "telegram_rag_bot.__main__.main",
+      "evidence": "workspace/telegram-rag-bot/telegram_rag_bot/__main__.py"
+    },
+    {
+      "target": "telegram_rag_bot.main.main (async)",
+      "evidence": "workspace/telegram-rag-bot/telegram_rag_bot/main.py"
+    }
+  ],
+  "modules": [
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/__main__.py",
+      "role": "CLI init/run/rebuild/version",
+      "hotspot_score": 0.2
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/main.py",
+      "role": "Bot bootstrap, Router/provider wiring, hot reload, health and metrics",
+      "hotspot_score": 0.4
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/handlers.py",
+      "role": "Telegram commands/messages and mode selection",
+      "hotspot_score": 0.7
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/config_loader.py",
+      "role": "YAML configuration, variable substitution and mode directory validation",
+      "hotspot_score": 0.8
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/mode_loader.py",
+      "role": "Bundles: mode.yaml, system prompt, FAQ and optional examples",
+      "hotspot_score": 1.0
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/langchain_adapter/rag_chains.py",
+      "role": "RAGChainFactory, chunking, prompts and index rebuild",
+      "hotspot_score": 0.6
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/embeddings/factory.py",
+      "role": "Local/GigaChat/Yandex embedding selection",
+      "hotspot_score": 0.5
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/vectorstore/factory.py",
+      "role": "FAISS/OpenSearch selection",
+      "hotspot_score": 0.3
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/utils/session_manager.py",
+      "role": "Memory/Redis sessions",
+      "hotspot_score": 0.3
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/utils/feedback_collector.py",
+      "role": "Feedback storage",
+      "hotspot_score": 0.2
+    },
+    {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/usage_tracking.py",
+      "role": "Optional usage callback",
+      "hotspot_score": 0.2
+    },
+    {
+      "path": "workspace/telegram-rag-bot/orchestrator/router.py",
+      "role": "Multi-LLM routing/fallback core; protected by task constraints",
+      "hotspot_score": 0.0
+    },
+    {
+      "path": "workspace/telegram-rag-bot/orchestrator/retrieval/async_faiss.py",
+      "role": "Async FAISS retriever core; protected by task constraints",
+      "hotspot_score": 0.0
+    }
+  ],
+  "hotspot_score_basis": "Qualitative thematic-change exposure, not measured historical churn; no change proposal",
+  "config_points": [
+    {
+      "type": "application_yaml_template",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/templates/config.yaml.template",
+      "status": "present; legacy inline modes incompatible with current loader"
+    },
+    {
+      "type": "application_yaml",
+      "path": "workspace/telegram-rag-bot/config/config.yaml",
+      "status": "missing; runtime path expected by CLI/main"
+    },
+    {
+      "type": "yaml_mode",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/mode_loader.py",
+      "status": "loader present; runtime bundles absent",
+      "contract": "modes.directory -> child directory with mode.yaml; files.system_prompt and files.faq required; files.examples optional"
+    },
+    {
+      "type": "prompt",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/mode_loader.py",
+      "status": "loader contract only; no runtime system_prompt.md supplied"
+    },
+    {
+      "type": "faq",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/templates/faq_example.md",
+      "status": "example only; no runtime mode binding"
+    },
+    {
+      "type": "embedder",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/embeddings/factory.py",
+      "options": [
+        "local",
+        "gigachat",
+        "yandex"
+      ]
+    },
+    {
+      "type": "vectorstore",
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/vectorstore/factory.py",
+      "options": [
+        "faiss",
+        "opensearch"
+      ]
+    }
+  ],
+  "tests": {
+    "framework": "pytest + pytest-asyncio; pytest-cov declared dev extra",
+    "paths": [
+      "workspace/telegram-rag-bot/tests/conftest.py",
+      "workspace/telegram-rag-bot/tests/load_test.py",
+      "workspace/telegram-rag-bot/tests/test_config_hotreload.py",
+      "workspace/telegram-rag-bot/tests/test_config_loader.py",
+      "workspace/telegram-rag-bot/tests/test_embeddings.py",
+      "workspace/telegram-rag-bot/tests/test_feedback_collector.py",
+      "workspace/telegram-rag-bot/tests/test_handlers.py",
+      "workspace/telegram-rag-bot/tests/test_main.py",
+      "workspace/telegram-rag-bot/tests/test_mode_loader.py",
+      "workspace/telegram-rag-bot/tests/test_rag_chains.py",
+      "workspace/telegram-rag-bot/tests/test_session_manager.py",
+      "workspace/telegram-rag-bot/tests/test_usage_tracking.py",
+      "workspace/telegram-rag-bot/tests/test_vectorstore.py"
+    ],
+    "test_module_count": 11,
+    "ownership_evidence": "workspace/telegram-rag-bot/telegram_rag_bot-0.14.6.dist-info/RECORD",
+    "baseline_status": "not_run",
+    "reason": "Python 3.13 has no pytest; no dependencies installed during read-only audit",
+    "coverage": "unknown; not measured; no project coverage report supplied",
+    "evidence": ".agent/artifacts/g0_runtime_checks.json"
+  },
+  "deployment": {
+    "target_docker": "absent",
+    "target_k8s": "absent",
+    "target_build_manifest": "pyproject.toml/setup.py/requirements.txt absent in installed target",
+    "prometheus": {
+      "path": "workspace/telegram-rag-bot/telegram_rag_bot/utils/metrics.py",
+      "routes": [
+        "/health",
+        "/metrics"
+      ],
+      "route_evidence": "workspace/telegram-rag-bot/telegram_rag_bot/main.py"
+    },
+    "reference_docker": "workspace/sirchatalot-reference/Dockerfile (reference only)"
+  },
+  "references": [
+    {
+      "path": "workspace/multi-llm-orchestrator",
+      "role": "Orchestration reference v0.9.1; src/orchestrator and pytest suite",
+      "evidence": [
+        "workspace/multi-llm-orchestrator/pyproject.toml",
+        "workspace/multi-llm-orchestrator/tests/test_router.py",
+        "workspace/multi-llm-orchestrator/src/orchestrator/retrieval/async_faiss.py"
+      ]
+    },
+    {
+      "path": "workspace/sirchatalot-reference",
+      "role": "Separate Telegram assistant with OpenAI/ChromaDB/SQLite/MCP and Docker; not target baseline",
+      "evidence": [
+        "workspace/sirchatalot-reference/requirements.txt",
+        "workspace/sirchatalot-reference/main.py",
+        "workspace/sirchatalot-reference/Dockerfile",
+        "workspace/sirchatalot-reference/tests/test_rag.py"
+      ]
+    }
+  ],
+  "baseline": {
+    "baseline_status": "fail",
+    "g0_status": "need_info",
+    "cli_help": "pass",
+    "cli_version": "pass: 0.14.6",
+    "bot_run": "fail: missing config/config.yaml, exit 1",
+    "syntax": "62 Python files parsed successfully under 3.13.17; not a build/test result",
+    "build": "not run: source/build manifest absent",
+    "full_runtime": "not verified",
+    "evidence": [
+      ".agent/artifacts/g0_runtime_checks.json",
+      ".agent/artifacts/g0_syntax_check.json"
+    ]
+  }
+}

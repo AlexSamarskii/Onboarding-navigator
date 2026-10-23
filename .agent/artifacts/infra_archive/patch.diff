@@ -1,0 +1,826 @@
+--- /dev/null
++++ b/Dockerfile
+@@ -0,0 +1,28 @@
++FROM python:3.13-slim AS builder
++WORKDIR /build
++COPY workspace/telegram-rag-bot-src/ /build/
++RUN python -m pip install --no-cache-dir build wheel \
++    && python -m build --wheel --outdir /dist
++
++FROM python:3.13-slim AS runtime
++ENV PYTHONPATH=/app \
++    PYTHONDONTWRITEBYTECODE=1 \
++    PYTHONUNBUFFERED=1
++WORKDIR /app
++RUN useradd --uid 1000 --create-home app
++COPY --from=builder /dist/*.whl /app/
++RUN python -m pip install --no-cache-dir /app/*.whl
++COPY integrations/ /app/integrations/
++COPY analytics/ /app/analytics/
++COPY config/ /app/config/
++COPY deploy/build_config_overlay.py /tmp/build_config_overlay.py
++RUN python /tmp/build_config_overlay.py /app/config/config.yaml
++RUN rm /tmp/build_config_overlay.py
++RUN python -c "import yaml; c=yaml.safe_load(open('/app/config/config.yaml')); assert c['http_server']['port']==8080; assert c['http_server']['enabled'] is True"
++RUN mkdir -p /data/analytics /data/faiss \
++    && chown -R app:app /app /data
++USER app
++EXPOSE 8080
++HEALTHCHECK --interval=30s --timeout=6s --start-period=30s --retries=3 \
++    CMD python -c "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=5); sys.exit(0 if r.status==200 else 1)" || exit 1
++CMD ["python", "-m", "telegram_rag_bot", "run"]
+--- /dev/null
++++ b/.dockerignore
+@@ -0,0 +1,30 @@
++.agent/
++.agents/
++.venv/
++**/.venv/
++workspace/telegram-rag-bot/
++tests/
++**/tests/
++analytics/unanswered.jsonl
++.env
++.env.*
++**/.env
++**/.env.*
++*.pem
++*.key
++**/*.pem
++**/*.key
++dist/
++build/
++**/dist/
++**/build/
++**/*.egg-info/
++**/__pycache__/
++**/*.pyc
++.git/
++.idea/
++.codegraph/
++artifacts/
++.coverage*
++coverage.json
++*.log
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,13 @@
++artifacts/
++*.coverage
++.coverage*
++coverage.json
++*.log
++__pycache__/
++*.pyc
++.venv/
++*.egg-info/
++build/
++dist/
++.env
++.env.local
+--- /dev/null
++++ b/deploy/k8s/deployment.yaml
+@@ -0,0 +1,149 @@
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: onboarding-navigator-config
++data:
++  # Only this file overlays the baked config. Mode bundles and locale stay baked.
++  # To use the baked dev config, remove this volume mount explicitly.
++  config.yaml: |
++    modes:
++      directory: "modes"
++    rag:
++      score_threshold: 0.65
++    integrations:
++      ticketing:
++        url: "${TICKETING_WEBHOOK_URL}"
++        hr_chat_id: "${HR_CHAT_ID}"
++    i18n:
++      default_locale: "ru"
++    ADMIN_IDS: "${ADMIN_IDS}"
++    session:
++      ttl_seconds: 86400
++    retrieval:
++      async_mode: false
++    llm:
++      providers: [gigachat, yandexgpt]
++    http_server:
++      enabled: true
++      port: 8080
++    analytics:
++      unanswered_path: /data/analytics/unanswered.jsonl
++    vectorstore:
++      type: faiss
++      faiss:
++        indices_dir: /data/faiss
++---
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: onboarding-navigator
++spec:
++  replicas: 1
++  selector:
++    matchLabels:
++      app: onboarding-navigator
++  template:
++    metadata:
++      labels:
++        app: onboarding-navigator
++    spec:
++      securityContext:
++        runAsNonRoot: true
++        runAsUser: 1000
++        runAsGroup: 1000
++        fsGroup: 1000
++      initContainers:
++        - name: prepare-analytics
++          image: python:3.13-slim
++          command: ["python", "-c", "from pathlib import Path; Path('/data/analytics').mkdir(parents=True, exist_ok=True)"]
++          securityContext:
++            readOnlyRootFilesystem: true
++            allowPrivilegeEscalation: false
++            capabilities:
++              drop: [ALL]
++          resources:
++            requests: {cpu: 10m, memory: 32Mi}
++            limits: {cpu: 100m, memory: 64Mi}
++          volumeMounts:
++            - name: analytics-data
++              mountPath: /data
++      containers:
++        - name: onboarding-navigator
++          image: onboarding-navigator:latest
++          imagePullPolicy: IfNotPresent
++          ports:
++            - name: health-port
++              containerPort: 8080
++          resources:
++            requests: {cpu: "1", memory: 2Gi}
++            limits: {cpu: "2", memory: 4Gi}
++          securityContext:
++            readOnlyRootFilesystem: true
++            allowPrivilegeEscalation: false
++            capabilities:
++              drop: [ALL]
++          env:
++            - name: TELEGRAM_TOKEN
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: TELEGRAM_TOKEN}
++            - name: GIGACHAT_KEY
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: GIGACHAT_KEY}
++            - name: YANDEX_API_KEY
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: YANDEX_API_KEY}
++            - name: YANDEX_FOLDER_ID
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: YANDEX_FOLDER_ID}
++            - name: ADMIN_IDS
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: ADMIN_IDS}
++            - name: TICKETING_WEBHOOK_URL
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: TICKETING_WEBHOOK_URL}
++            - name: HR_CHAT_ID
++              valueFrom:
++                secretKeyRef: {name: telegram-secrets, key: HR_CHAT_ID}
++            - name: ANALYTICS_PATH
++              value: /data/analytics/unanswered.jsonl
++          livenessProbe:
++            httpGet: {path: /health, port: 8080}
++            initialDelaySeconds: 15
++            periodSeconds: 10
++            timeoutSeconds: 3
++            failureThreshold: 3
++          readinessProbe:
++            httpGet: {path: /health, port: 8080}
++            initialDelaySeconds: 15
++            periodSeconds: 10
++            timeoutSeconds: 3
++            failureThreshold: 3
++          volumeMounts:
++            - name: config-overlay
++              mountPath: /app/config/config.yaml
++              subPath: config/config.yaml
++              readOnly: true
++            - name: analytics-data
++              mountPath: /data
++      volumes:
++        - name: config-overlay
++          configMap:
++            name: onboarding-navigator-config
++            items:
++              - key: config.yaml
++                path: config/config.yaml
++        - name: analytics-data
++          emptyDir: {}
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: onboarding-navigator
++spec:
++  type: ClusterIP
++  selector:
++    app: onboarding-navigator
++  ports:
++    - name: health-port
++      port: 8080
++      targetPort: 8080
+--- /dev/null
++++ b/tests/load/run_baseline.py
+@@ -0,0 +1,188 @@
++#!/usr/bin/env python3
++"""Reproducible open-loop load against an operator-provided Telegram bridge.
++
++The target is a POST endpoint accepting {request_id, mode, query}. Its response
++must be JSON {request_id: <same id>, telegram_e2e_completed: true} emitted only
++after the bot's Telegram reply arrives. A webhook acknowledgement or Bot API
++sendMessage acknowledgement alone cannot prove an end-to-end measurement and
++is counted as failure. The frozen app provides no such HTTP query endpoint;
++an external bridge is an environment prerequisite, never supplied by this tool.
++No application imports, credentials discovery, or network calls in --dry-run.
++"""
++
++from __future__ import annotations
++
++import argparse
++from collections import Counter
++from concurrent.futures import ThreadPoolExecutor, as_completed
++from datetime import datetime, timezone
++import json
++import math
++from pathlib import Path
++import random
++import sys
++import time
++import urllib.error
++import urllib.request
++
++
++SCENARIOS = (
++    ("vpn", "it_support", "Как подключить VPN?"),
++    ("mail", "it_support", "Как настроить корпоративную почту?"),
++    ("git", "it_support", "Как получить Git-доступ?"),
++    ("insurance", "benefits", "Как подключить ДМС?"),
++    ("vacation", "benefits", "Как оформить отпуск?"),
++    ("sick_leave", "benefits", "Как оформить больничный?"),
++    ("courses", "learning", "Где находится каталог курсов?"),
++    ("approval", "learning", "Как согласовать обучение?"),
++    ("budget", "learning", "Какой бюджет на обучение?"),
++    ("schedule", "culture", "Какой график работы?"),
++    ("dress_code", "culture", "Какой дресс-код?"),
++    ("business_trip", "culture", "Как оформить командировку?"),
++)
++RAG_UNAVAILABLE = (
++    "rag-only requires /debug/rag_latency endpoint, which is not "
++    "exposed by the frozen application. AC-N02 remains "
++    "pending_environment pending a separate small PR or an "
++    "out-of-band profiling run."
++)
++
++
++def percentile95(values: list[float]) -> float:
++    """User-specified zero-based index: sorted[950] for 1000 samples."""
++    if not values:
++        raise ValueError("p95 requires samples")
++    return sorted(values)[min(math.floor(len(values) * 0.95), len(values) - 1)]
++
++
++def build_manifest(offered: int, samples: int, seed: int) -> list[dict]:
++    """Sample offered request IDs independently per cyclic scenario stratum."""
++    rng = random.Random(seed)
++    base, extra = divmod(samples, len(SCENARIOS))
++    result = []
++    for scenario_index, (scenario, mode, query) in enumerate(SCENARIOS):
++        population = range(scenario_index, offered, len(SCENARIOS))
++        count = base + (scenario_index < extra)
++        if count > len(population):
++            raise ValueError("insufficient offered requests for stratified sample")
++        for request_id in rng.sample(population, count):
++            result.append({"request_id": request_id, "scenario": scenario,
++                           "mode": mode, "query": query})
++    return sorted(result, key=lambda row: row["request_id"])
++
++
++def post_query(target_url: str, request_id: int, mode: str, query: str,
++               scheduled_at: float | None = None) -> float:
++    """Measure completed bridge round trip; any error contributes +infinity."""
++    payload = json.dumps({"request_id": request_id, "mode": mode,
++                          "query": query}, ensure_ascii=False).encode("utf-8")
++    request = urllib.request.Request(target_url, data=payload, method="POST",
++                                     headers={"Content-Type": "application/json"})
++    started = time.monotonic() if scheduled_at is None else scheduled_at
++    try:
++        with urllib.request.urlopen(request, timeout=30) as response:
++            result = json.loads(response.read(1024 * 1024).decode("utf-8"))
++            if not 200 <= response.status < 300:
++                return math.inf
++        if (not isinstance(result, dict)
++                or result.get("telegram_e2e_completed") is not True
++                or result.get("request_id") != request_id):
++            return math.inf
++        return (time.monotonic() - started) * 1000
++    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
++        return math.inf
++
++
++def run_offered(args, offered: int, selected: set[int]) -> dict[int, float]:
++    """Offer every cyclic request at the declared rate, including unsampled ones."""
++    measurements = {}
++    # Allow all timeout-bound requests to remain in flight at the offered rate.
++    # Timing includes scheduler/worker delay, preventing coordinated omission.
++    with ThreadPoolExecutor(max_workers=math.ceil(args.rps * 30) + 1) as pool:
++        for warmup_id in range(args.warmup):
++            _, mode, query = SCENARIOS[warmup_id % len(SCENARIOS)]
++            # Warmup requests are deliberately outside the measured ID range.
++            post_query(args.target_url, -warmup_id - 1, mode, query)
++        start = time.monotonic()
++        futures = {}
++        for request_id in range(offered):
++            scheduled_at = start + request_id / args.rps
++            delay = scheduled_at - time.monotonic()
++            if delay > 0:
++                time.sleep(delay)
++            _, mode, query = SCENARIOS[request_id % len(SCENARIOS)]
++            future = pool.submit(post_query, args.target_url, request_id, mode, query,
++                                 scheduled_at)
++            futures[future] = request_id
++        for future in as_completed(futures):
++            request_id = futures[future]
++            if request_id in selected:
++                try:
++                    measurements[request_id] = future.result()
++                except Exception:
++                    measurements[request_id] = math.inf
++    return measurements
++
++
++def main(argv=None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--target-url")
++    parser.add_argument("--warmup", type=int, default=100)
++    parser.add_argument("--rps", type=float, default=10)
++    parser.add_argument("--duration", type=int, default=300)
++    parser.add_argument("--samples", type=int, default=1000)
++    parser.add_argument("--seed", type=int, default=0)
++    parser.add_argument("--out", type=Path, default=Path("artifacts"))
++    parser.add_argument("--dry-run", action="store_true")
++    mode = parser.add_mutually_exclusive_group()
++    mode.add_argument("--telegram-e2e", "--telegram-only", action="store_true", default=True)
++    mode.add_argument("--rag-only", action="store_true")
++    args = parser.parse_args(argv)
++    if args.rag_only:
++        print(RAG_UNAVAILABLE, file=sys.stderr)
++        return 2
++    if (not math.isfinite(args.rps) or args.rps <= 0 or args.duration <= 0
++            or args.samples <= 0 or args.warmup < 0):
++        parser.error("rps/duration/samples must be positive; warmup must be nonnegative")
++    offered = math.floor(args.rps * args.duration)
++    try:
++        manifest = build_manifest(offered, args.samples, args.seed)
++    except ValueError as error:
++        parser.error(str(error))
++    if not args.dry_run and (not args.target_url or not args.target_url.startswith(("http://", "https://"))):
++        parser.error("--target-url must identify an external HTTP(S) Telegram round-trip bridge")
++    args.out.mkdir(parents=True, exist_ok=True)
++    plan = {"seed": args.seed, "expected_rps": args.rps,
++            "expected_duration": args.duration, "offered_request_count": offered,
++            "expected_request_count": offered + args.warmup,
++            "warmup_request_count": args.warmup,
++            "sample_count": len(manifest),
++            "stratification": dict(Counter(row["scenario"] for row in manifest)),
++            "thresholds": {"p95_telegram_e2e_ms": 3000, "p95_rag_only_ms": 200},
++            "sample_manifest": manifest}
++    # Persist before warmup or any measured request; identical inputs give identical JSON.
++    (args.out / "sample_manifest.json").write_text(
++        json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    if args.dry_run:
++        print(json.dumps(plan, ensure_ascii=False))
++        return 0
++    print("warning: RAG-only latency unavailable; no /debug/rag_latency endpoint", file=sys.stderr)
++    measurements = run_offered(args, offered, {row["request_id"] for row in manifest})
++    values = [measurements.get(row["request_id"], math.inf) for row in manifest]
++    p95 = percentile95(values)
++    # Standard JSON cannot represent infinity: encode it explicitly, never as zero.
++    summary = {"timestamp": datetime.now(timezone.utc).isoformat(),
++               "sample_count": len(values), "failed_samples": sum(math.isinf(v) for v in values),
++               "p95_telegram_e2e_ms": p95 if math.isfinite(p95) else "+inf",
++               "rag_only_ms": None, "rag_only_status": "pending_environment",
++               "threshold_met": p95 <= 3000,
++               "samples": [{"request_id": row["request_id"],
++                            "telegram_e2e_ms": value if math.isfinite(value) else "+inf"}
++                           for row, value in zip(manifest, values)]}
++    (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
++    print(json.dumps({key: value for key, value in summary.items() if key != "samples"}))
++    return 0 if p95 <= 3000 else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- /dev/null
++++ b/deploy/build_config_overlay.py
+@@ -0,0 +1,62 @@
++"""Apply the image-only HTTP configuration; never resolve environment values."""
++import argparse
++from pathlib import Path
++import sys
++
++import yaml
++
++
++def load_config(path):
++    with Path(path).open(encoding="utf-8") as stream:
++        return yaml.safe_load(stream)
++
++
++def apply_overlay(config):
++    if not isinstance(config, dict):
++        raise ValueError("config must be a mapping")
++    http_server = config.setdefault("http_server", {})
++    if not isinstance(http_server, dict):
++        raise ValueError("http_server must be a mapping")
++    http_server.update(enabled=True, port=8080)
++    return config
++
++
++def dump_config(path, config):
++    with Path(path).open("w", encoding="utf-8") as stream:
++        yaml.safe_dump(config, stream, allow_unicode=True, sort_keys=False,
++                       default_flow_style=False)
++
++
++def verify_overlay(path, expected_keys=None):
++    config = load_config(path)
++    if not isinstance(config, dict):
++        raise ValueError("config must be a mapping")
++    server = config.get("http_server")
++    if (not isinstance(server, dict) or server.get("enabled") is not True
++            or server.get("port") != 8080):
++        raise ValueError("HTTP overlay verification failed")
++    if expected_keys is not None and set(config) != set(expected_keys):
++        raise ValueError("top-level configuration keys changed")
++    return config
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("config_path", type=Path)
++    args = parser.parse_args(argv)
++    try:
++        config = load_config(args.config_path)
++        if not isinstance(config, dict):
++            raise ValueError("config must be a mapping")
++        expected_keys = set(config) | {"http_server"}
++        dump_config(args.config_path, apply_overlay(config))
++        verify_overlay(args.config_path, expected_keys)
++    except (OSError, ValueError, yaml.YAMLError):
++        print("build config overlay failed: invalid or inaccessible configuration",
++              file=sys.stderr)
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- /dev/null
++++ b/.agent/artifacts/infra_checks/test_dockerfile_syntax.py
+@@ -0,0 +1,63 @@
++"""Static image contract checks; never starts Docker."""
++from pathlib import Path
++import json
++import re
++
++ROOT = Path(__file__).resolve().parents[3]
++
++
++def assert_image_contract(text):
++    assert re.search(r'^FROM python:3\.13-slim AS builder$', text, re.M)
++    assert re.search(r'^FROM python:3\.13-slim AS runtime$', text, re.M)
++    assert 'COPY workspace/telegram-rag-bot-src/ /build/' in text
++    assert 'python -m build --wheel --outdir /dist' in text
++    assert 'COPY --from=builder /dist/*.whl /app/' in text
++    assert 'python -m pip install --no-cache-dir /app/*.whl' in text
++    assert re.search(r'^USER (app|1000)$', text, re.M)
++    assert '--uid 1000' in text
++    assert 'HEALTHCHECK ' in text and 'urllib.request.urlopen' in text
++    assert 'timeout=5' in text and '127.0.0.1:8080/health' in text
++    assert re.search(r'^EXPOSE 8080$', text, re.M)
++    cmd = re.findall(r'^CMD (.+)$', text, re.M)
++    assert len(cmd) == 1
++    assert json.loads(cmd[0]) == ['python', '-m', 'telegram_rag_bot', 'run']
++    assert 'COPY deploy/build_config_overlay.py /tmp/build_config_overlay.py' in text
++    assert 'RUN python /tmp/build_config_overlay.py /app/config/config.yaml' in text
++    assert 'RUN rm /tmp/build_config_overlay.py' in text
++    assert "assert c['http_server']['port']==8080" in text
++    assert "assert c['http_server']['enabled'] is True" in text
++    assert text.index('COPY config/') < text.index('RUN python /tmp/build_config_overlay.py') < text.index('chown -R') < text.index('USER app')
++    assert 'WORKDIR /app' in text
++    assert 'PYTHONPATH=/app' in text and 'PYTHONDONTWRITEBYTECODE=1' in text
++    assert 'PYTHONUNBUFFERED=1' in text
++    assert 'ENV CONFIG_PATH' not in text
++    assert not re.search(r'(?i)sk-|eyJ|password=|^ARG .*SECRET|^ENV .*TOKEN=', text, re.M)
++    for package in ('integrations', 'analytics', 'config'):
++        assert f'COPY {package}/ /app/{package}/' in text
++
++
++def test_context_excludes_sensitive_and_audit_files():
++    lines = set((ROOT / '.dockerignore').read_text().splitlines())
++    for required in ('.agent/', '.agents/', '.venv/', '.env', '.env.*', 'tests/',
++                     'workspace/telegram-rag-bot/', 'dist/', 'build/',
++                     'analytics/unanswered.jsonl', '**/*.pem', '**/*.key'):
++        assert required in lines
++    assert 'workspace/telegram-rag-bot-src/' not in lines
++    ignores = set((ROOT / '.gitignore').read_text().splitlines())
++    assert {'artifacts/', '*.coverage', '.coverage*', 'coverage.json', '*.log',
++            '__pycache__/', '*.pyc', '.venv/', '*.egg-info/', 'build/', 'dist/',
++            '.env', '.env.local'} <= ignores
++    assert '.agent/artifacts/' not in ignores
++
++
++def test_image_contract():
++    assert_image_contract((ROOT / 'Dockerfile').read_text())
++
++
++def test_removed_overlay_or_postassert_is_rejected():
++    import pytest
++    text = (ROOT / 'Dockerfile').read_text()
++    for prefix in ('RUN python /tmp/build_config_overlay.py', 'RUN python -c "import yaml;'):
++        mutated = '\n'.join(line for line in text.splitlines() if not line.startswith(prefix))
++        with pytest.raises(AssertionError):
++            assert_image_contract(mutated)
+--- /dev/null
++++ b/.agent/artifacts/infra_checks/test_image_config_overlay.py
+@@ -0,0 +1,86 @@
++"""Image-copy overlay contract, including deliberate mutation controls."""
++from copy import deepcopy
++import inspect
++from pathlib import Path
++import subprocess
++import sys
++import pytest
++import yaml
++from deploy.build_config_overlay import apply_overlay, verify_overlay, load_config, dump_config
++import deploy.build_config_overlay as overlay
++
++ROOT = Path(__file__).resolve().parents[3]
++
++
++@pytest.fixture
++def product():
++    return yaml.safe_load((ROOT / 'config/config.yaml').read_text())
++
++
++def test_product_preserved_and_roundtrip(product, tmp_path):
++    before = deepcopy(product)
++    result = apply_overlay(product)
++    assert result['http_server'] == {'enabled': True, 'port': 8080}
++    assert {k:v for k,v in result.items() if k != 'http_server'} == before
++    assert list(result) == list(before) + ['http_server']
++    result['unicode_example'] = 'Привет, сотрудник'
++    path = tmp_path / 'config.yaml'
++    dump_config(path, result)
++    assert 'Привет, сотрудник' in path.read_text()
++    assert load_config(path) == result
++    assert list(load_config(path)) == list(result)
++    assert verify_overlay(path, set(result)) == result
++
++
++@pytest.mark.parametrize('original', [{'enabled': True, 'port': 8000},
++    {'enabled': False, 'port': 9000, 'extra': 'x'}])
++def test_existing_server_replaced_values_retains_extra(original):
++    config = {'rag': {'score_threshold': .65}, 'http_server': deepcopy(original)}
++    result = apply_overlay(config)
++    assert result['http_server'] == {**original, 'enabled': True, 'port': 8080}
++    assert apply_overlay(deepcopy(result)) == result
++
++
++@pytest.mark.parametrize('config', [[], 'text', None, {'http_server': 'text'}, {'http_server': []}])
++def test_invalid_types(config):
++    with pytest.raises(ValueError):
++        apply_overlay(config)
++
++
++def test_verify_rejects_bad_port_enabled_and_lost_keys(tmp_path):
++    path = tmp_path / 'config.yaml'
++    for config, keys in [({'http_server': {'port': 9000, 'enabled': True}}, {'http_server'}),
++        ({'http_server': {'port': 8080, 'enabled': False}}, {'http_server'}),
++        ({'http_server': {'port': 8080, 'enabled': True}}, {'http_server', 'rag'})]:
++        dump_config(path, config)
++        with pytest.raises(ValueError):
++            verify_overlay(path, keys)
++
++
++def test_setdefault_mutation_is_detected():
++    source = inspect.getsource(apply_overlay)
++    assert source.count('http_server.update(enabled=True, port=8080)') == 1
++    mutated = source.replace('http_server.update(enabled=True, port=8080)',
++        'http_server.setdefault("enabled", True); http_server.setdefault("port", 8080)')
++    namespace = {}
++    exec(compile(mutated, '<negative-control>', 'exec'), namespace)
++    result = namespace['apply_overlay']({'http_server': {'enabled': False, 'port': 9000}})
++    with pytest.raises(AssertionError):
++        assert result['http_server'] == {'enabled': True, 'port': 8080}
++
++
++def test_main_postverify_and_error_exit(product, tmp_path, monkeypatch):
++    path = tmp_path / 'config.yaml'
++    dump_config(path, product)
++    calls = []
++    real_verify = overlay.verify_overlay
++    def record(path, expected_keys=None):
++        calls.append(set(expected_keys))
++        return real_verify(path, expected_keys)
++    monkeypatch.setattr(overlay, 'verify_overlay', record)
++    assert overlay.main([str(path)]) == 0
++    assert calls == [set(product) | {'http_server'}]
++    dump_config(path, {'http_server': 'invalid'})
++    process = subprocess.run([sys.executable, '-B', str(ROOT / 'deploy/build_config_overlay.py'), str(path)], capture_output=True, text=True, timeout=10)
++    assert process.returncode == 1
++    assert 'overlay failed' in process.stderr
+--- /dev/null
++++ b/.agent/artifacts/infra_checks/test_k8s_manifest.py
+@@ -0,0 +1,75 @@
++"""Offline structural checks; external schema tool is optional."""
++from pathlib import Path
++import re
++import shutil
++import subprocess
++import pytest
++import yaml
++
++ROOT = Path(__file__).resolve().parents[3]
++MANIFEST = ROOT / 'deploy/k8s/deployment.yaml'
++SECRETS = {'TELEGRAM_TOKEN', 'GIGACHAT_KEY', 'YANDEX_API_KEY', 'YANDEX_FOLDER_ID',
++           'ADMIN_IDS', 'TICKETING_WEBHOOK_URL', 'HR_CHAT_ID'}
++
++
++def test_deployment_service_and_overlay():
++    text = MANIFEST.read_text()
++    docs = {doc['kind']: doc for doc in yaml.safe_load_all(text)}
++    assert set(docs) == {'Deployment', 'Service', 'ConfigMap'}
++    deploy = docs['Deployment']
++    assert deploy['apiVersion'] == 'apps/v1'
++    assert deploy['spec']['replicas'] == 1
++    pod = deploy['spec']['template']['spec']
++    assert pod['securityContext']['runAsNonRoot'] is True
++    assert pod['securityContext']['runAsUser'] == 1000
++    assert pod['securityContext']['fsGroup'] == 1000
++    app = pod['containers'][0]
++    assert app['resources'] == {'requests': {'cpu': '1', 'memory': '2Gi'},
++                                'limits': {'cpu': '2', 'memory': '4Gi'}}
++    for container in [app, *pod['initContainers']]:
++        security = container['securityContext']
++        assert security['readOnlyRootFilesystem'] is True
++        assert security['allowPrivilegeEscalation'] is False
++        assert security['capabilities']['drop'] == ['ALL']
++    for probe in ('readinessProbe', 'livenessProbe'):
++        assert app[probe]['httpGet'] == {'path': '/health', 'port': 8080}
++        assert app[probe]['initialDelaySeconds'] == 15
++        assert app[probe]['periodSeconds'] == 10
++        assert app[probe]['timeoutSeconds'] == 3
++        assert app[probe]['failureThreshold'] == 3
++    env = {entry['name']: entry for entry in app['env']}
++    assert set(env) == SECRETS | {'ANALYTICS_PATH'}
++    for name in SECRETS:
++        assert env[name] == {'name': name, 'valueFrom': {
++            'secretKeyRef': {'name': 'telegram-secrets', 'key': name}}}
++    assert env['ANALYTICS_PATH']['value'] == '/data/analytics/unanswered.jsonl'
++    mounts = {entry['name']: entry for entry in app['volumeMounts']}
++    assert mounts['config-overlay'] == {'name': 'config-overlay',
++        'mountPath': '/app/config/config.yaml', 'subPath': 'config/config.yaml', 'readOnly': True}
++    assert mounts['analytics-data']['mountPath'] == '/data'
++    volumes = {volume['name']: volume for volume in pod['volumes']}
++    assert volumes['analytics-data']['emptyDir'] == {}
++    assert volumes['config-overlay']['configMap']['name'] == docs['ConfigMap']['metadata']['name']
++    overlay = yaml.safe_load(docs['ConfigMap']['data']['config.yaml'])
++    source = yaml.safe_load((ROOT / 'config/config.yaml').read_text())
++    for key, value in source.items():
++        assert overlay[key] == value
++    assert overlay['http_server'] == {'enabled': True, 'port': 8080}
++    assert overlay['analytics']['unanswered_path'] == '/data/analytics/unanswered.jsonl'
++    assert overlay['vectorstore']['faiss']['indices_dir'] == '/data/faiss'
++    assert docs['Service']['spec']['type'] == 'ClusterIP'
++    assert docs['Service']['spec']['ports'][0]['port'] == 8080
++    assert docs['Service']['spec']['ports'][0]['targetPort'] == 8080
++    assert not re.search(r'eyJ|sk-|password=', text)
++
++
++def test_kubeconform_offline():
++    executable = shutil.which('kubeconform')
++    if not executable:
++        pytest.skip('kubeconform not installed; schema validated offline by structure assertions above')
++    schemas = ROOT / '.agent/artifacts/infra_checks/kubernetes-json-schema'
++    if not schemas.is_dir():
++        pytest.skip('kubeconform installed but local offline JSON schemas absent; network validation prohibited')
++    result = subprocess.run([executable, '-strict', '-summary', '-schema-location',
++        str(schemas / '{{.ResourceKind}}.json'), str(MANIFEST)], capture_output=True, text=True)
++    assert result.returncode == 0, result.stdout + result.stderr
+--- /dev/null
++++ b/.agent/artifacts/infra_checks/test_load_runner_dry_run.py
+@@ -0,0 +1,67 @@
++"""Only --dry-run subprocess execution; unit checks never perform HTTP."""
++from pathlib import Path
++from collections import Counter
++import ast
++import importlib.util
++import json
++import math
++import subprocess
++import sys
++
++ROOT = Path(__file__).resolve().parents[3]
++RUNNER = ROOT / 'tests/load/run_baseline.py'
++
++
++def load_runner():
++    spec = importlib.util.spec_from_file_location('infra_runner', RUNNER)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def test_dry_run_contract(tmp_path):
++    result = subprocess.run([sys.executable, '-B', str(RUNNER), '--dry-run', '--seed', '0',
++        '--rps', '10', '--duration', '300', '--samples', '1000', '--out', str(tmp_path)],
++        capture_output=True, text=True, timeout=10)
++    assert result.returncode == 0, result.stderr
++    output = json.loads(result.stdout)
++    assert output == json.loads((tmp_path / 'sample_manifest.json').read_text())
++    assert output['seed'] == 0 and output['expected_rps'] == 10
++    assert output['expected_duration'] == 300
++    assert output['offered_request_count'] == 3000
++    assert output['expected_request_count'] == 3100
++    entries = output['sample_manifest']
++    assert len(entries) == 1000
++    assert len({row['request_id'] for row in entries}) == 1000
++    module = load_runner()
++    for row in entries:
++        scenario, mode, query = module.SCENARIOS[row['request_id'] % 12]
++        assert (row['scenario'], row['mode'], row['query']) == (scenario, mode, query)
++        assert 0 <= row['request_id'] < 3000
++    counts = Counter(row['scenario'] for row in entries)
++    assert [counts[row[0]] for row in module.SCENARIOS] == [84] * 4 + [83] * 8
++    assert output['thresholds']['p95_telegram_e2e_ms'] == 3000
++    assert output['thresholds']['p95_rag_only_ms'] == 200
++    assert not (tmp_path / 'summary.json').exists()
++
++
++def test_no_application_imports_and_dry_run_cannot_request(tmp_path, monkeypatch, capsys):
++    module = load_runner()
++    tree = ast.parse(RUNNER.read_text())
++    for node in ast.walk(tree):
++        if isinstance(node, ast.Import):
++            assert all(not item.name.startswith('telegram_rag_bot') for item in node.names)
++        if isinstance(node, ast.ImportFrom):
++            assert not (node.module or '').startswith('telegram_rag_bot')
++    def forbidden(*args, **kwargs):
++        raise AssertionError('dry-run reached HTTP code')
++    monkeypatch.setattr(module.urllib.request, 'urlopen', forbidden)
++    assert module.main(['--dry-run', '--telegram-e2e', '--target-url', 'http://unused.invalid',
++                        '--out', str(tmp_path)]) == 0
++    assert json.loads(capsys.readouterr().out)['sample_count'] == 1000
++
++
++def test_p95_and_failures():
++    module = load_runner()
++    assert module.percentile95(list(reversed(range(1000)))) == 950
++    assert module.percentile95([0] * 950 + [math.inf] * 50) == math.inf
+--- /dev/null
++++ b/.agent/artifacts/infra_checks/test_load_runner_sampling_determinism.py
+@@ -0,0 +1,32 @@
++"""Replay manifest selections with no real traffic."""
++from pathlib import Path
++import json
++import subprocess
++import sys
++
++ROOT = Path(__file__).resolve().parents[3]
++RUNNER = ROOT / 'tests/load/run_baseline.py'
++
++
++def dry_run(seed, out):
++    result = subprocess.run([sys.executable, '-B', str(RUNNER), '--dry-run', '--seed', str(seed),
++                             '--out', str(out)], capture_output=True, text=True, timeout=10)
++    assert result.returncode == 0, result.stderr
++    return json.loads(result.stdout)['sample_manifest']
++
++
++def test_sampling_replays_and_varies(tmp_path):
++    assert dry_run(0, tmp_path / 'first') == dry_run(0, tmp_path / 'second')
++    assert dry_run(0, tmp_path / 'first') != dry_run(1, tmp_path / 'third')
++
++
++def test_rag_only_fails_explicitly_even_in_dry_run(tmp_path):
++    result = subprocess.run([sys.executable, '-B', str(RUNNER), '--rag-only', '--dry-run',
++        '--out', str(tmp_path / 'not_created')], capture_output=True, text=True, timeout=10)
++    assert result.returncode == 2
++    assert result.stderr.strip() == (
++        'rag-only requires /debug/rag_latency endpoint, which is not '
++        'exposed by the frozen application. AC-N02 remains '
++        'pending_environment pending a separate small PR or an '
++        'out-of-band profiling run.')
++    assert not (tmp_path / 'not_created').exists()

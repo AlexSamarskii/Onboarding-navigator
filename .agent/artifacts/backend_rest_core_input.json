@@ -1,0 +1,30 @@
+{
+  "stage": "G2/backend-rest-core",
+  "allowed_files": [
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/mode_loader.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/config_loader.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/utils/session_manager.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/utils/metrics.py"
+  ],
+  "change_plan": ".agent/artifacts/backend_rest_core_change_plan.yaml",
+  "snapshot": ".agent/artifacts/backend_rest_core_snapshot.json",
+  "acceptance": ".agent/artifacts/acceptance_criteria.yaml",
+  "reuse": ".agent/artifacts/reuse_map.yaml",
+  "review_limit": 3,
+  "tests_directory": ".agent/artifacts/backend_rest_core_checks",
+  "test_modules": [
+    "test_mode_loader_new_fields.py",
+    "test_mode_loader_legacy_greeting.py",
+    "test_config_loader_product.py",
+    "test_session_profile.py",
+    "test_metrics_new_series.py"
+  ],
+  "constraints": [
+    "Only four authorized product files; no new modules or dependencies",
+    "No secret-file access or real environment secrets in tests; runtime substitute only explicit ENV_VAR references",
+    "Three explicit legacy marker fallback literals are latest user-authorized exception to prior zero-Cyrillic AST criterion; document honestly",
+    "Keep generic display_name/source_titles values unresolved",
+    "Current 12 protected hashes plus data/embeddings/deferred paths must remain unchanged",
+    "No full G2 claim; stop before adapters"
+  ]
+}

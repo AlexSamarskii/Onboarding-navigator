@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onboarding-navigator-config
+data:
+  # Only this file overlays the baked config. Mode bundles and locale stay baked.
+  # To use the baked dev config, remove this volume mount explicitly.
+  config.yaml: |
+    modes:
+      directory: "modes"
+    rag:
+      score_threshold: 0.65
+    integrations:
+      ticketing:
+        url: "${TICKETING_WEBHOOK_URL}"
+        hr_chat_id: "${HR_CHAT_ID}"
+    i18n:
+      default_locale: "ru"
+    ADMIN_IDS: "${ADMIN_IDS}"
+    session:
+      ttl_seconds: 86400
+    retrieval:
+      async_mode: false
+    llm:
+      providers: [gigachat, yandexgpt]
+    http_server:
+      enabled: true
+      port: 8080
+    analytics:
+      unanswered_path: /data/analytics/unanswered.jsonl
+    vectorstore:
+      type: faiss
+      faiss:
+        indices_dir: /data/faiss
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: onboarding-navigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: onboarding-navigator
+  template:
+    metadata:
+      labels:
+        app: onboarding-navigator
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: prepare-analytics
+          image: python:3.13-slim
+          command: ["python", "-c", "from pathlib import Path; Path('/data/analytics').mkdir(parents=True, exist_ok=True)"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          volumeMounts:
+            - name: analytics-data
+              mountPath: /data
+      containers:
+        - name: onboarding-navigator
+          image: onboarding-navigator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: health-port
+              containerPort: 8080
+          resources:
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {cpu: "2", memory: 4Gi}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: TELEGRAM_TOKEN
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: TELEGRAM_TOKEN}
+            - name: GIGACHAT_KEY
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: GIGACHAT_KEY}
+            - name: YANDEX_API_KEY
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: YANDEX_API_KEY}
+            - name: YANDEX_FOLDER_ID
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: YANDEX_FOLDER_ID}
+            - name: ADMIN_IDS
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: ADMIN_IDS}
+            - name: TICKETING_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: TICKETING_WEBHOOK_URL}
+            - name: HR_CHAT_ID
+              valueFrom:
+                secretKeyRef: {name: telegram-secrets, key: HR_CHAT_ID}
+            - name: ANALYTICS_PATH
+              value: /data/analytics/unanswered.jsonl
+          livenessProbe:
+            httpGet: {path: /health, port: 8080}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /health, port: 8080}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: config-overlay
+              mountPath: /app/config/config.yaml
+              subPath: config/config.yaml
+              readOnly: true
+            - name: analytics-data
+              mountPath: /data
+      volumes:
+        - name: config-overlay
+          configMap:
+            name: onboarding-navigator-config
+            items:
+              - key: config.yaml
+                path: config/config.yaml
+        - name: analytics-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: onboarding-navigator
+spec:
+  type: ClusterIP
+  selector:
+    app: onboarding-navigator
+  ports:
+    - name: health-port
+      port: 8080
+      targetPort: 8080

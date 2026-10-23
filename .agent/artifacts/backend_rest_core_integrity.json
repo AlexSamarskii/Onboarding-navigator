@@ -1,0 +1,23 @@
+{
+  "protected_hashes": {
+    "checked": 12,
+    "changed": []
+  },
+  "additional_unchanged_hashes": {
+    "checked": 26,
+    "changed": []
+  },
+  "deferred_paths_before": {
+    "checked": 5,
+    "changed": []
+  },
+  "patch_paths": [
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/mode_loader.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/config_loader.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/utils/session_manager.py",
+    "workspace/telegram-rag-bot-src/telegram_rag_bot/utils/metrics.py"
+  ],
+  "snapshot_diff_exact": true,
+  "reverse_apply_check": "pass",
+  "patch_sha256": "99e2e3578c2acf482ff5b7f5a76e604cb8b9ea5d92359a1970114413b069411e"
+}

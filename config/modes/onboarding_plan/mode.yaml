@@ -1,0 +1,16 @@
+name: onboarding_plan
+display_name: mode.onboarding_plan
+description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
+  компании.
+enabled: true
+files:
+  system_prompt: system_prompt.md
+  faq: faq.md
+timeout_seconds: 30
+source_titles:
+  faq.md: mode.onboarding_plan
+  system_prompt.md: mode.onboarding_plan
+  plans/developer.md: mode.onboarding_plan
+  plans/developer__engineering.md: mode.onboarding_plan
+  plans/default.md: mode.onboarding_plan
+plans_directory: plans

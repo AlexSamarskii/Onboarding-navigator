@@ -1,0 +1,100 @@
+{
+  "approved_delete_targets": 15,
+  "outside_trb_sdist_user_approval": true,
+  "comparison": "exact du -sh output with same restricted-path exclusions as proposal",
+  "targets": [
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "expected_du": "164K\t.agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "actual_du": "164K\t.agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/tmp",
+      "expected_du": "168K\t.agent/artifacts/backend_rest_adapters_checks/tmp",
+      "actual_du": "168K\t.agent/artifacts/backend_rest_adapters_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_wiring_checks/tmp",
+      "expected_du": "0B\t.agent/artifacts/backend_rest_wiring_checks/tmp",
+      "actual_du": "0B\t.agent/artifacts/backend_rest_wiring_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/g0_reaudit/tmp",
+      "expected_du": "0B\t.agent/artifacts/g0_reaudit/tmp",
+      "actual_du": "0B\t.agent/artifacts/g0_reaudit/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "expected_du": "44K\t.agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "actual_du": "44K\t.agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "expected_du": "28K\t.agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "actual_du": "28K\t.agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp",
+      "expected_du": "632K\t.agent/artifacts/backend_rest_i18n_checks/tmp",
+      "actual_du": "632K\t.agent/artifacts/backend_rest_i18n_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "expected_du": "356K\t.agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "actual_du": "356K\t.agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "expected_du": "52K\t.agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "actual_du": "52K\t.agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "expected_du": "8.0K\t.agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "actual_du": "8.0K\t.agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_core_checks/tmp",
+      "expected_du": "676K\t.agent/artifacts/backend_rest_core_checks/tmp",
+      "actual_du": "676K\t.agent/artifacts/backend_rest_core_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/infra_checks/tmp",
+      "expected_du": "780K\t.agent/artifacts/infra_checks/tmp",
+      "actual_du": "780K\t.agent/artifacts/infra_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "expected_du": "72K\t.agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "actual_du": "72K\t.agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "exit_code": 0
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/tmp",
+      "expected_du": "72K\t.agent/artifacts/backend_preflight_checks/tmp",
+      "actual_du": "72K\t.agent/artifacts/backend_preflight_checks/tmp",
+      "exit_code": 0
+    },
+    {
+      "path": "/tmp/trb-sdist",
+      "expected_du": "120K\t/tmp/trb-sdist",
+      "actual_du": "120K\t/tmp/trb-sdist",
+      "exit_code": 0
+    }
+  ],
+  "differences": [],
+  "status": "pass",
+  "deletions_executed": false
+}

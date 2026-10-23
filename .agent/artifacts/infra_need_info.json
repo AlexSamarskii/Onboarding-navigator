@@ -1,0 +1,58 @@
+{
+  "agent": "Orchestrator",
+  "status": "need_info",
+  "artifact_ref": ".agent/artifacts/infra_need_info.json",
+  "notes": "Infra requirements conflict with frozen runtime contracts; no infra or product files changed. No Docker, cluster, HTTP, load or coverage execution performed. G2 remains open.",
+  "questions": [
+    "Подтвердите замену неподдерживаемого CMD python -m telegram_rag_bot --config ... на python -m telegram_rag_bot run при WORKDIR /app.",
+    "Разрешаете runtime-only overlay для копии config.yaml в Docker image и внешнем ConfigMap: http_server.port=8080, analytics.unanswered_path=/data/analytics/unanswered.jsonl, vectorstore.type=faiss, vectorstore.faiss.indices_dir=/data/faiss? Исходный config/ останется неизменным; /data должен быть writable для uid1000.",
+    "Каков HTTP-контракт внешнего load-test bridge для --target-url (метод, JSON запроса/ответа, подтверждение завершения Telegram-ответа)? Приложение предоставляет только /health и /metrics, не HTTP-обработчик вопросов. /debug/rag_latency может оставаться недоступным с warning, как разрешено.",
+    "Разрешаете добавить .gitignore с artifacts/ как пятый infra-файл? В задании он требуется, но отсутствует в списке четырёх разрешённых файлов; сейчас .gitignore отсутствует."
+  ],
+  "evidence": [
+    {
+      "file": "workspace/telegram-rag-bot-src/telegram_rag_bot/__main__.py",
+      "lines": [
+        323,
+        332
+      ],
+      "finding": "CLI accepts run subcommand, no --config option."
+    },
+    {
+      "file": "workspace/telegram-rag-bot-src/telegram_rag_bot/main.py",
+      "lines": [
+        180,
+        251,
+        763,
+        773,
+        774,
+        779
+      ],
+      "finding": "HTTP port comes from config.http_server.port, default8000; ANALYTICS_PATH/HEALTH_PORT not consumed. FAISS and analytics defaults are under read-only /app. HTTP exposes health/metrics only."
+    }
+  ],
+  "safe_proposed_overlay": {
+    "http_server": {
+      "enabled": true,
+      "port": 8080
+    },
+    "analytics": {
+      "unanswered_path": "/data/analytics/unanswered.jsonl"
+    },
+    "vectorstore": {
+      "type": "faiss",
+      "faiss": {
+        "indices_dir": "/data/faiss"
+      }
+    }
+  },
+  "integrity": {
+    "previous_frozen_checked": 44,
+    "accepted_i18n_files_checked": 8,
+    "unchanged": 52
+  },
+  "infra_started": false,
+  "g2_complete": false,
+  "resolution_status": "resolved_by_user",
+  "resolution": "Four infra decisions plus approved run CMD and solution5 narrow image-only overlay; implementation complete offline, see review.json. External environment checks remain pending."
+}

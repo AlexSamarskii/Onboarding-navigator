@@ -1,0 +1,120 @@
+{
+  "gate": "G2",
+  "verdict": "pass_with_pending_environment",
+  "zones_completed": [
+    "backend-rest-core",
+    "backend-rest-adapters",
+    "backend-rest-wiring",
+    "backend-rest-i18n",
+    "infra"
+  ],
+  "ac_summary": {
+    "total": 35,
+    "ok": 31,
+    "pending_environment": 4,
+    "risk": 0,
+    "fail": 0
+  },
+  "ac_by_status": {
+    "ok": [
+      "AC-S1",
+      "AC-S2",
+      "AC-S3",
+      "AC-S4",
+      "AC-S5",
+      "AC-S6",
+      "AC-S7",
+      "AC-S8",
+      "AC-F01",
+      "AC-F02",
+      "AC-F03",
+      "AC-F04",
+      "AC-F05",
+      "AC-N03",
+      "AC-N04",
+      "AC-N05",
+      "AC-N06",
+      "AC-N07",
+      "AC-N10",
+      "AC-N11",
+      "AC-C01",
+      "AC-C02",
+      "AC-C03",
+      "AC-C04",
+      "AC-C05",
+      "AC-C06",
+      "AC-C07",
+      "AC-O01",
+      "AC-O02",
+      "AC-U01",
+      "AC-U02"
+    ],
+    "pending_environment": [
+      "AC-N01",
+      "AC-N02",
+      "AC-N08",
+      "AC-N09"
+    ]
+  },
+  "pending_environment_detail": {
+    "AC-N01": {
+      "reason": "requires real Telegram completion bridge and load env",
+      "artifacts": [
+        "tests/load/run_baseline.py"
+      ],
+      "reproduction": "см. implementation_note.md#pending_environment_reproduction"
+    },
+    "AC-N02": {
+      "status": "blocked",
+      "reason": "no /debug/rag_latency endpoint in frozen app",
+      "options": [
+        "separate PR adding endpoint",
+        "py-spy/pyinstrument profiling"
+      ]
+    },
+    "AC-N08": {
+      "reason": "docker build/run requires Docker daemon"
+    },
+    "AC-N09": {
+      "reason": "k8s deploy requires real cluster + telegram-secrets"
+    }
+  },
+  "coverage": {
+    "percent": 78.006,
+    "statements": 2869,
+    "covered": 2238
+  },
+  "frozen_hashes_verified": 44,
+  "i18n_hashes_verified": 8,
+  "constraints_compliance": {
+    "AC-C02": "orchestrator/router.py unchanged",
+    "AC-C03": "RAGChainFactory/async_faiss.py/rag_chains.py unchanged",
+    "AC-C06": "no calendar/voice/EN/analytics-UI/HR-auth/purchases/HR-data changes",
+    "AC-C07": "handlers.py+mode_loader.py AST clean; 3 marked mode_loader fallbacks; handlers_legacy.py excluded (unreachable in HR runtime)"
+  },
+  "timeline_zones": {
+    "core": {
+      "reviews": 2,
+      "fix_cycles": 1
+    },
+    "adapters": {
+      "reviews": 2,
+      "fix_cycles": 1
+    },
+    "wiring": {
+      "reviews": 1,
+      "fix_cycles": 0,
+      "preformal_repairs": 3
+    },
+    "i18n": {
+      "reviews": 2,
+      "fix_cycles": 1
+    },
+    "infra": {
+      "reviews": 1,
+      "fix_cycles": 0,
+      "preformal_repairs": 2
+    }
+  },
+  "note": "G2 pass conditional on real-environment execution of 4 pending AC. Zero functional defects. Superseded test archived with SHA256. Narrow main.py fix authorized and reviewed (reload_config legacy branch)."
+}

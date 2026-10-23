@@ -1,0 +1,24 @@
+{
+  "repo_path": "./workspace/telegram-rag-bot",
+  "reference_paths": [
+    "./workspace/multi-llm-orchestrator",
+    "./workspace/sirchatalot-reference"
+  ],
+  "source_path": "./workspace/telegram-rag-bot-src",
+  "target_version": "0.14.6",
+  "tz_text": "HR-бот Onboarding Navigator: онбординг и HR-поддержка сотрудников",
+  "constraints": "Python 3.11+, не менять ядро multi-LLM fallback и RAG, сохранить YAML-режимы",
+  "scope": "Reaudit G0; call TZ Agent only if G0 passes",
+  "user_claims": {
+    "mode_bundle": "workspace/telegram-rag-bot/config/modes/it_support",
+    "venv": ".venv, pytest and pytest-asyncio installed",
+    "test_command": "pytest tests/ -v",
+    "build_manifest": "workspace/telegram-rag-bot-src/pyproject.toml"
+  },
+  "restrictions": [
+    "Do not access .env or .env.* files, including examples",
+    "Write artifacts only under .agent/artifacts",
+    "No implementation or source modifications",
+    "No live LLM or Telegram calls"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "source": "explicit_user_confirmation",
+  "confirmed_at_utc": "2026-10-23T20:34:30.701005+00:00",
+  "confirmation": "Проверено вручную: пример готов, рабочие env-файлы не публикуются",
+  "env_example_ready_user_confirmed": true,
+  "seven_variables_ready_user_confirmed": true,
+  "working_env_not_published_user_confirmed": true,
+  "env_files_accessed_by_agent": false,
+  "env_example_created_by_agent": false
+}

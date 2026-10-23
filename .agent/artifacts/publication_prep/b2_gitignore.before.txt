@@ -1,0 +1,13 @@
+artifacts/
+*.coverage
+.coverage*
+coverage.json
+*.log
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+build/
+dist/
+.env
+.env.local

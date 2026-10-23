@@ -1,0 +1,28 @@
+{
+  "AGENTS.md": [
+    {
+      "line": 30,
+      "text": "   структурой — как в `.agent/prompts/` или в шапке роли."
+    },
+    {
+      "line": 53,
+      "text": "Все агенты пишут и читают артефакты только через `.agent/artifacts/`:"
+    }
+  ],
+  "workspace/telegram-rag-bot-src/tests/test_hr_acceptance.py": [
+    {
+      "line": 219,
+      "text": "    checks = runpy.run_path(str(ROOT / '.agent/artifacts/backend_rest_i18n_checks/test_legacy_and_ui_cyrillic.py'))"
+    },
+    {
+      "line": 226,
+      "text": "    check = runpy.run_path(str(ROOT / '.agent/artifacts/backend_rest_i18n_checks/test_legacy_and_ui_cyrillic.py'))['assert_ui_cyrillic_allowed']"
+    }
+  ],
+  "workspace/telegram-rag-bot-src/tests/test_hr_adapters.py": [
+    {
+      "line": 3,
+      "text": "Coverage is checked by .agent/artifacts/backend_rest_i18n_checks/check_coverage.py"
+    }
+  ]
+}

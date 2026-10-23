@@ -1,0 +1,928 @@
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/main.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/main.py
+@@ -6,6 +6,13 @@
+ """
+ 
+ import asyncio
++from contextlib import contextmanager
++from contextvars import ContextVar
++from copy import deepcopy
++from datetime import datetime, timezone
++import os
++from pathlib import Path
++from types import SimpleNamespace
+ import logging
+ import signal
+ import time
+@@ -15,6 +22,14 @@
+ from telegram.ext import Application, CommandHandler, MessageHandler, filters
+ from prometheus_client import generate_latest
+ 
++from orchestrator import Router
++
++from telegram_rag_bot.i18n import load_locale
++from telegram_rag_bot.hr_adapter import HRFAISSProvider, IndexCoordinator
++from telegram_rag_bot.diagnostics import load_graph
++from telegram_rag_bot.utils.metrics import register_metrics, LLM_REQUESTS, FALLBACK_TOTAL
++from integrations.ticketing import TicketClient
++from analytics.writer import UnansweredWriter
+ from telegram_rag_bot.config_loader import ConfigLoader
+ from telegram_rag_bot.langchain_adapter.rag_chains import RAGChainFactory
+ from telegram_rag_bot.utils.session_manager import SessionManager
+@@ -68,6 +83,196 @@
+ # Global references для SIGHUP handler (устанавливаются в main())
+ router: Router = None  # type: ignore
+ rag_factory: RAGChainFactory = None  # type: ignore
++
++
++
++_generation_state = ContextVar("hr_generation_state", default=None)
++
++
++@contextmanager
++def generation_scope():
++    """One model request only; never let failed attempts leak to another request."""
++    token = _generation_state.set({"failed_gigachat": False, "switched": False})
++    try:
++        yield
++    finally:
++        _generation_state.reset(token)
++
++
++class ProviderObserver:
++    """Transparent provider decorator; health checks are not generation attempts."""
++    def __init__(self, provider, health_cache):
++        self.provider = provider
++        self.health_cache = health_cache
++
++    def __getattr__(self, name):
++        return getattr(self.provider, name)
++
++    async def generate(self, prompt, params=None):
++        name = self.config.name
++        state = _generation_state.get()
++        if name == "yandexgpt" and state is not None and state["failed_gigachat"] and not state["switched"]:
++            FALLBACK_TOTAL.labels(type="llm").inc()
++            state["switched"] = True
++        try:
++            result = await self.provider.generate(prompt, params)
++        except (Exception, asyncio.CancelledError):
++            LLM_REQUESTS.labels(provider=name, status="failure").inc()
++            if name == "gigachat" and state is not None:
++                state["failed_gigachat"] = True
++            raise
++        LLM_REQUESTS.labels(provider=name, status="success").inc()
++        return result
++
++    async def health_check(self):
++        name = self.config.name
++        try:
++            result = await self.provider.health_check()
++        except (Exception, asyncio.CancelledError):
++            self.health_cache[name] = "fail"
++            self.health_cache.setdefault("last_check_iso", {})[name] = datetime.now(timezone.utc).isoformat()
++            raise
++        self.health_cache[name] = "ok" if result else "fail"
++        self.health_cache.setdefault("last_check_iso", {})[name] = datetime.now(timezone.utc).isoformat()
++        return result
++
++
++class RequestScopedRouter(Router):
++    """Forward to the unchanged Router with one context per route invocation.
++
++    A forwarding Router subtype satisfies the existing LangChain model's type
++    contract. It neither selects providers nor implements fallback: the original
++    Router owns both, including when LangChain creates its own worker thread.
++    """
++    def __init__(self, delegate):
++        self.delegate = delegate
++
++    def __getattr__(self, name):
++        return getattr(self.delegate, name)
++
++    async def route(self, prompt, params=None):
++        with generation_scope():
++            return await self.delegate.route(prompt, params)
++
++
++def normalize_runtime_config(config):
++    """Add product bootstrap defaults without altering the ConfigLoader contract.
++
++    Only the named runtime environment variables below provide credentials.
++    This function does not read credential files. Legacy sections are retained.
++    """
++    config = deepcopy(config)
++    config.setdefault("telegram", {"token": os.environ.get("TELEGRAM_TOKEN", "")})
++    if "orchestrator" not in config:
++        providers = []
++        for name in config.get("llm", {}).get("providers", ["gigachat", "yandexgpt"]):
++            if name == "gigachat":
++                item = {"api_key": os.environ.get("GIGACHAT_KEY", ""), "model": "GigaChat", "scope": "GIGACHAT_API_PERS"}
++                kind = "GigaChatProvider"
++            elif name == "yandexgpt":
++                item = {"api_key": os.environ.get("YANDEX_API_KEY", ""), "folder_id": os.environ.get("YANDEX_FOLDER_ID", ""), "model": "yandexgpt/latest"}
++                kind = "YandexGPTProvider"
++            else:
++                raise ValueError("unsupported product LLM provider")
++            providers.append({"name": name, "type": kind, "enabled": True, "config": item})
++        config["orchestrator"] = {"strategy": "first-available", "providers": providers}
++    config.setdefault("embeddings", {"type": "gigachat", "gigachat": {"api_key": os.environ.get("GIGACHAT_KEY", ""), "model": "Embeddings", "scope": "GIGACHAT_API_PERS"}})
++    config.setdefault("vectorstore", {"type": "faiss", "faiss": {"indices_dir": ".faiss_indices"}})
++    config.setdefault("langchain", {"chunk_size": 1000, "chunk_overlap": 100})
++    config.setdefault("storage", {"sessions": {"url": None, "ttl_seconds": config.get("session", {}).get("ttl_seconds", 86400)}})
++    if config.get("retrieval", {}).get("async_mode", False) is not False:
++        raise ValueError("HR retrieval requires retrieval.async_mode=False")
++    if config["vectorstore"].get("type") != "faiss":
++        raise ValueError("HR retrieval requires the FAISS provider")
++    return config
++
++
++def observe_providers(providers, health_cache):
++    # The core metric facade deliberately restricts labels to these two names.
++    for provider in providers:
++        if provider.config.name not in {"gigachat", "yandexgpt"}:
++            raise ValueError("HR provider names must be gigachat or yandexgpt")
++    return [provider if isinstance(provider, ProviderObserver) else ProviderObserver(provider, health_cache) for provider in providers]
++
++
++def collect_sources(modes_directory, modes):
++    """Collect only Markdown files within active canonical mode bundles."""
++    root = Path(modes_directory).resolve(strict=True)
++    result = {}
++    for mode in modes:
++        bundle = root / mode
++        if not bundle.resolve(strict=True).is_relative_to(root):
++            raise ValueError("mode source escapes configured root")
++        for path in sorted(bundle.rglob("*.md")):
++            resolved = path.resolve(strict=True)
++            if not resolved.is_relative_to(bundle.resolve()) or not resolved.is_file():
++                raise ValueError("mode source escapes bundle")
++            result[path] = mode
++    return result
++
++
++async def bootstrap_components(config_path="config/config.yaml"):
++    """Initialize components without starting Telegram, HTTP or background tasks.
++
++    Tests inject fakes at each boundary, including ConfigLoader; no live network
++    is necessary to verify initialization order and startup failure behavior.
++    """
++    config_path = Path(config_path).resolve()
++    config = ConfigLoader.load_config(str(config_path))
++    locale = config.get("i18n", {}).get("default_locale", "ru")
++    load_locale(config_path.parent / "i18n" / f"{locale}.yaml")
++    register_metrics()
++    config = normalize_runtime_config(config)
++    setup_logging(config)
++    health_cache = {"gigachat": "fail", "yandexgpt": "fail", "last_check_iso": {}}
++    platform = config.get("platform", {})
++    usage_callback = create_track_usage_callback(tenant_id=platform.get("tenant_id", ""), callback_url=platform.get("callback_url"), platform_key_id=platform.get("platform_key_id"))
++    local_router = create_router(config["orchestrator"], usage_callback=usage_callback)
++    # Do not start Router's Prometheus exporter: it writes the same LLM series.
++    llm = MultiLLMOrchestrator(router=RequestScopedRouter(local_router))
++    factory = RAGChainFactory(llm=llm, embeddings_config=config["embeddings"], vectorstore_config=config["vectorstore"], chunk_config=config["langchain"], modes=config["modes"], retrieval_config=config.get("retrieval", {}))
++    provider_config = {**config["vectorstore"].get("faiss", {}), **config.get("rag", {})}
++    provider = HRFAISSProvider(provider_config, factory.embeddings_provider, rag_factory=factory, score_threshold=config.get("rag", {}).get("score_threshold", 0.65))
++    factory.vectorstore_provider = provider
++    modes_directory = Path(config.get("modes_directory", config_path.parent / "modes")).resolve()
++    coordinator = IndexCoordinator(provider, modes_directory, chunk_size=config["langchain"]["chunk_size"], chunk_overlap=config["langchain"]["chunk_overlap"])
++    state = {"started_at": time.monotonic(), "last_reindex": "never"}
++    try:
++        await coordinator.ingest(collect_sources(modes_directory, config["modes"]))
++        state["last_reindex"] = datetime.now(timezone.utc).isoformat()
++    except Exception:
++        logger.error("initial HR indexing failed; startup continues without a fresh index")
++    ticketing = config.get("integrations", {}).get("ticketing", {})
++    try:
++        ticket_client = TicketClient(url=ticketing.get("url", ""), hr_chat_id=ticketing.get("hr_chat_id") or None)
++    except ValueError:
++        ticket_client = None
++        logger.warning("ticket webhook unavailable; escalation will report failure")
++    path = Path(config.get("analytics", {}).get("unanswered_path", "analytics/unanswered.jsonl"))
++    if not path.parent.is_dir():
++        logger.warning("analytics parent missing; writes unavailable until runtime volume is mounted")
++    writer = UnansweredWriter(path)
++    graph = None
++    diagnostic_file = config["modes"].get("it_support", {}).get("diagnostics_file", "diagnostics.yaml")
++    graph_path = modes_directory / "it_support" / diagnostic_file
++    if graph_path.is_file():
++        try:
++            graph = load_graph(graph_path)
++        except Exception:
++            logger.error("diagnostic graph unavailable; startup continues")
++    local_router.providers = observe_providers(local_router.providers, health_cache)
++    sessions = SessionManager(redis_url=config["storage"]["sessions"].get("url"), ttl_seconds=config["storage"]["sessions"]["ttl_seconds"])
++    feedback = FeedbackCollector(sessions.redis_client)
++    handlers = TelegramHandlers(rag_factory=factory, session_manager=sessions, config=config, feedback_collector=feedback, coordinator=coordinator, ticket_client=ticket_client, unanswered_writer=writer, diagnostics_graph=graph, health_cache=health_cache, modes_directory=modes_directory, runtime_state=state, request_scope=generation_scope)
++    return SimpleNamespace(config=config, router=local_router, rag_factory=factory, session_manager=sessions, handlers=handlers, health_cache=health_cache, runtime_state=state)
++
++
++def register_command_handlers(application, handlers):
++    from telegram.ext import CallbackQueryHandler
++    for command, method in (("start", handlers.cmd_start), ("mode", handlers.cmd_set_mode), ("reindex", handlers.cmd_reindex), ("reload_faq", handlers.cmd_reindex), ("status", handlers.cmd_status), ("help", handlers.cmd_help), ("feedback", handlers.cmd_feedback), ("escalate", handlers.cmd_escalate), ("diagnostics", handlers.cmd_diagnostics)):
++        application.add_handler(CommandHandler(command, method))
++    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.handle_message))
++    application.add_handler(CallbackQueryHandler(handlers.handle_callback_query))
+ 
+ 
+ def setup_logging(config: Dict[str, Any]) -> None:
+@@ -323,10 +528,12 @@
+         try:
+             # Re-read config.yaml
+             logger.info("🔄 Reloading config.yaml...")
+-            new_config = ConfigLoader.load_config("config/config.yaml")
++            new_config = normalize_runtime_config(ConfigLoader.load_config("config/config.yaml"))
+ 
+             # Build new providers list
+             new_providers = build_providers_list(new_config["orchestrator"])
++            health_cache = next((p.health_cache for p in router.providers if isinstance(p, ProviderObserver)), {"gigachat": "fail", "yandexgpt": "fail"})
++            new_providers = observe_providers(new_providers, health_cache)
+ 
+             # Validate non-empty
+             if not new_providers:
+@@ -535,203 +742,19 @@
+     application = None  # Initialize for finally block
+ 
+     try:
+-        # 1. Load config
+-        config = ConfigLoader.load_config("config/config.yaml")
+-        logger.info("✅ Config loaded successfully")
+-        logger.info(
+-            "Bot starting | Available modes: %s | Default: %s",
+-            list(config["modes"].keys()),
+-            list(config["modes"].keys())[0],
+-        )
+-
+-        # 1.5. Setup structured logging from config
+-        setup_logging(config)
+-
+-        # 1.6. Create track_usage callback with platform config
+-        platform_config = config.get("platform", {})
+-        tenant_id = platform_config.get("tenant_id", "")
+-        callback_url = platform_config.get("callback_url")
+-        platform_key_id = platform_config.get("platform_key_id")
+-
+-        track_usage_callback = create_track_usage_callback(
+-            tenant_id=tenant_id,
+-            callback_url=callback_url,
+-            platform_key_id=platform_key_id,
+-        )
+-
+-        # Bug #2: Validate critical environment variables
+-        telegram_token = config["telegram"]["token"]
+-        if not telegram_token or telegram_token.startswith("${"):
+-            logger.error("TELEGRAM_TOKEN environment variable not set")
+-            logger.error("Create .env file with: TELEGRAM_TOKEN=your_token_here")
+-            raise SystemExit(1)
+-
+-        # Validate at least one provider has valid API key
+-        has_valid_provider = False
+-        for provider_cfg in config["orchestrator"]["providers"]:
+-            if not provider_cfg.get("enabled", True):
+-                continue
+-            api_key = provider_cfg["config"].get("api_key", "")
+-            if api_key and not api_key.startswith("${"):
+-                has_valid_provider = True
+-                break
+-
+-        if not has_valid_provider:
+-            logger.error("No enabled provider has valid API key set")
+-            logger.error("Set environment variables: GIGACHAT_KEY, YANDEX_API_KEY")
+-            raise SystemExit(1)
+-
+-        # Bug #2: Validate embeddings/vectorstore environment variables
+-        # Validate embeddings config (if using cloud providers)
+-        if config["embeddings"]["type"] == "gigachat":
+-            gigachat_api_key = config["embeddings"]["gigachat"].get("api_key", "")
+-            if not gigachat_api_key or gigachat_api_key.startswith("${"):
+-                logger.error(
+-                    "GIGACHAT_EMBEDDINGS_KEY not set (required for gigachat embeddings)"
+-                )
+-                logger.error(
+-                    "Set environment variable: GIGACHAT_EMBEDDINGS_KEY=your_key_here"
+-                )
+-                raise SystemExit(1)
+-
+-        # Validate vectorstore config (if using OpenSearch)
+-        if config["vectorstore"]["type"] == "opensearch":
+-            opensearch_host = config["vectorstore"]["opensearch"].get("host", "")
+-            if not opensearch_host or opensearch_host.startswith("${"):
+-                logger.error(
+-                    "OPENSEARCH_HOST not set (required for opensearch vectorstore)"
+-                )
+-                logger.error("Set environment variable: OPENSEARCH_HOST=your_host_here")
+-                raise SystemExit(1)
+-
+-        # 2. Create Router with providers and usage callback
+-        router = create_router(
+-            config["orchestrator"], usage_callback=track_usage_callback
+-        )
+-        provider_count = len(router.providers)
+-        logger.info(f"✅ Router created with {provider_count} providers")
+-
+-        # Make router available globally for SIGHUP handler
+-        globals()["router"] = router
+-
+-        # 3. Create LangChain LLM
+-        llm = MultiLLMOrchestrator(router=router)
+-        logger.info("✅ LangChain LLM created (MultiLLMOrchestrator)")
+-
+-        # 4. Create RAG factory
+-        rag_factory = RAGChainFactory(
+-            llm=llm,
+-            embeddings_config=config["embeddings"],
+-            vectorstore_config=config["vectorstore"],
+-            chunk_config=config["langchain"],
+-            modes=config["modes"],
+-            retrieval_config=config.get(
+-                "retrieval", {}
+-            ),  # v0.11.0: async FAISS support
+-        )
+-        logger.info("✅ RAG factory initialized")
+-
+-        # Make rag_factory available globally for SIGHUP handler
+-        globals()["rag_factory"] = rag_factory
+-
+-        # 4.4. Warmup embeddings model (preload to avoid first-request delay)
+-        logger.info("🔥 Warming up embeddings model...")
+-        try:
+-            # Trigger embeddings loading by encoding a test string
+-            test_text = "test warmup query"
+-            _ = await rag_factory.embeddings_provider.embed_query(test_text)
+-            logger.info("✅ Embeddings model warmed up and ready")
+-        except Exception as e:
+-            logger.warning(f"⚠️ Embeddings warmup failed (will load on first use): {e}")
+-
+-        # 4.5. Build FAISS indices for all modes (if using FAISS)
+-        if config["vectorstore"]["type"] == "faiss":
+-            logger.info("🔨 Building FAISS indices for all modes...")
+-            from pathlib import Path
+-
+-            # Get indices_dir from vectorstore config (default: .faiss_indices)
+-            vectorstore_config = config["vectorstore"]
+-            faiss_config = vectorstore_config.get("faiss", {})
+-            indices_dir_str = faiss_config.get("indices_dir", ".faiss_indices")
+-            indices_dir = Path(indices_dir_str)
+-
+-            for mode_name, mode_data in config["modes"].items():
+-                try:
+-                    # Получить путь к FAQ файлу
+-                    faq_file = mode_data.get("faq_file")
+-
+-                    if not faq_file:
+-                        logger.warning(
+-                            f"⏭️ Mode '{mode_name}' has no faq_file, skipping index build"
+-                        )
+-                        continue
+-
+-                    # Проверить существование индекса
+-                    index_path = indices_dir / mode_name
+-
+-                    if index_path.exists() and (index_path / "index.faiss").exists():
+-                        logger.info(
+-                            f"✅ FAISS index already exists for mode '{mode_name}', skipping"
+-                        )
+-                        continue
+-
+-                    # Создать индекс
+-                    logger.info(
+-                        f"🔨 Building FAISS index for mode '{mode_name}' from {faq_file}..."
+-                    )
+-                    await rag_factory.rebuild_index(mode_name, faq_file)
+-                    logger.info(f"✅ FAISS index built for mode '{mode_name}'")
+-
+-                except Exception as e:
+-                    logger.error(
+-                        f"❌ Failed to build FAISS index for mode '{mode_name}': {e}",
+-                        exc_info=True,
+-                    )
+-                    # Не падать, продолжить для других modes
+-                    continue
+-
+-            logger.info("✅ All FAISS indices ready")
+-
+-        # 5. Create session manager
+-        session_manager = SessionManager(
+-            redis_url=config["storage"]["sessions"].get("url"),
+-            ttl_seconds=config["storage"]["sessions"]["ttl_seconds"],
+-        )
+-        logger.info("✅ Session manager initialized")
+-
+-        # 5.5. Create feedback collector
+-        feedback_collector = FeedbackCollector(session_manager.redis_client)
+-        logger.info("✅ Feedback collector initialized")
+-
+-        # 5.6. Start background task for metrics
++        components = await bootstrap_components("config/config.yaml")
++        config = components.config
++        globals()["router"] = components.router
++        globals()["rag_factory"] = components.rag_factory
++        rag_factory = components.rag_factory
++        session_manager = components.session_manager
++        handlers = components.handlers
++        token = config["telegram"]["token"]
++        if not token or token.startswith("${"):
++            raise ValueError("TELEGRAM_TOKEN runtime environment variable is required")
+         metrics_task = asyncio.create_task(update_active_users_metric(session_manager))
+-        logger.info("✅ Background metrics task started")
+-
+-        # 6. Create handlers
+-        handlers = TelegramHandlers(
+-            rag_factory=rag_factory,
+-            session_manager=session_manager,
+-            config=config,
+-            feedback_collector=feedback_collector,
+-        )
+-        logger.info("✅ Telegram handlers created")
+-
+-        # 7. Create application
+-        application = Application.builder().token(config["telegram"]["token"]).build()
+-
+-        # 8. Register handlers
+-        application.add_handler(CommandHandler("start", handlers.cmd_start))
+-        application.add_handler(CommandHandler("mode", handlers.cmd_set_mode))
+-        application.add_handler(CommandHandler("reload_faq", handlers.cmd_reload_faq))
+-        application.add_handler(CommandHandler("help", handlers.cmd_help))
+-        application.add_handler(CommandHandler("feedback", handlers.cmd_feedback))
+-        application.add_handler(
+-            MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.handle_message)
+-        )
+-        from telegram.ext import CallbackQueryHandler
+-
+-        application.add_handler(CallbackQueryHandler(handlers.handle_callback_query))
+-        logger.info("✅ Handlers registered (help, feedback, callback)")
++        application = Application.builder().token(token).build()
++        register_command_handlers(application, handlers)
+ 
+         # 8.5. HTTP Server Configuration (Issue #3)
+         # Support disabling HTTP server for Shared Bot Pool mode (prevents port conflicts)
+--- a/workspace/telegram-rag-bot-src/telegram_rag_bot/handlers.py
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/handlers.py
+@@ -11,7 +11,18 @@
+ import asyncio
+ import logging
+ import time
+-from datetime import datetime
++from contextlib import nullcontext
++from pathlib import Path
++from importlib.metadata import version, PackageNotFoundError
++import re
++from datetime import datetime, timezone
++from langchain_core.callbacks import BaseCallbackHandler
++from telegram_rag_bot.i18n import t
++from telegram_rag_bot.citations import extract_citation
++from telegram_rag_bot.hr_adapter import LowScoreFallback
++from telegram_rag_bot.utils.metrics import FALLBACK_TOTAL, RAG_SCORE
++from integrations.ticketing import Ticket
++from analytics.writer import UnansweredEntry
+ from typing import Any, Dict
+ 
+ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+@@ -49,6 +60,9 @@
+         session_manager: SessionManager,
+         config: Dict[str, Any],
+         feedback_collector: FeedbackCollector,
++        *, coordinator=None, ticket_client=None, unanswered_writer=None,
++        diagnostics_graph=None, health_cache=None, runtime_state=None,
++        modes_directory=None, request_scope=None, generation_scope=None, started_at=None,
+     ):
+         """
+         Initialize handlers.
+@@ -63,6 +77,18 @@
+         self.session_manager = session_manager
+         self.config = config
+         self.feedback_collector = feedback_collector
++        self.coordinator = coordinator
++        self.ticket_client = ticket_client
++        self.unanswered_writer = unanswered_writer
++        self.diagnostics_graph = diagnostics_graph
++        self.health_cache = health_cache if health_cache is not None else {}
++        self.runtime_state = runtime_state if runtime_state is not None else {
++            "started_at": started_at if started_at is not None else time.monotonic(),
++            "last_reindex": "never",
++        }
++        self.modes_directory = Path(modes_directory).resolve() if modes_directory else None
++        self.request_scope = request_scope or generation_scope or nullcontext
++        self._ticket_locks = {}
+ 
+         # Default mode: first key in config["modes"] (avoids KeyError on stale session)
+         self.DEFAULT_MODE = list(config["modes"].keys())[0]
+@@ -83,8 +109,8 @@
+         Returns:
+             True if user is in admin_ids list
+         """
+-        admin_ids = self.config["telegram"].get("admin_ids", [])
+-        return user_id in admin_ids
++        admin_ids = self.config.get("ADMIN_IDS", self.config.get("telegram", {}).get("admin_ids", []))
++        return isinstance(admin_ids, list) and user_id in admin_ids
+ 
+     def _escape_markdown_v2(self, text: str) -> str:
+         """
+@@ -117,7 +143,7 @@
+         if display is None:
+             # Fallback: capitalize snake_case
+             display = mode.replace("_", " ").title()
+-        return display
++        return self._ui(display)
+ 
+     async def cmd_start(
+         self, update: Update, context: ContextTypes.DEFAULT_TYPE
+@@ -221,7 +247,7 @@
+         # Create inline keyboard with mode buttons
+         keyboard = []
+         for mode_key, mode_config in modes.items():
+-            display_name = mode_config.get("display_name", mode_key)
++            display_name = self._get_mode_display(mode_key)
+             keyboard.append(
+                 [InlineKeyboardButton(display_name, callback_data=f"mode:{mode_key}")]
+             )
+@@ -333,6 +359,8 @@
+             update: Telegram Update object
+             context: Callback context
+         """
++        if self.coordinator is not None:
++            return await self.cmd_reindex(update, context)
+         if not update.message:
+             return
+         if not update.effective_user:
+@@ -415,7 +443,7 @@
+ 
+         logger.info(f"Admin {user_id} reloaded FAQ index for mode: {mode}")
+ 
+-    async def handle_message(
++    async def _legacy_handle_message(
+         self, update: Update, context: ContextTypes.DEFAULT_TYPE
+     ) -> None:
+         """
+@@ -845,6 +873,10 @@
+             logger.warning(f"Empty callback data from user {user_id}")
+             return
+ 
++        if query.data.startswith("diag:") or query.data == "ticket:explicit":
++            await self._hr_callback(update, context)
++            return
++
+         parts = query.data.split(":")
+         if len(parts) < 2:
+             logger.warning(f"Invalid callback data format: {query.data}")
+@@ -1049,3 +1081,344 @@
+             )
+ 
+             logger.info(f"User {user_id} switched to mode: {new_mode} via callback")
++
++
++    @staticmethod
++    def _ui(key, **kwargs):
++        try:
++            return t(key, **kwargs)
++        except (KeyError, RuntimeError, ValueError):
++            return key
++
++    async def _send(self, message, text, **kwargs):
++        # Chunk the raw text before escaping: a full verbatim citation is never
++        # silently truncated and no Markdown escape pair is split across messages.
++        for offset in range(0, len(text) or 1, 900):
++            part = text[offset:offset + 900]
++            try:
++                await message.reply_text(self._escape_markdown_v2(part),
++                                         parse_mode=ParseMode.MARKDOWN_V2, **kwargs)
++            except Exception:
++                await message.reply_text(part, **kwargs)
++
++    @staticmethod
++    def collect_sources(root, modes):
++        root = Path(root).resolve()
++        result = {}
++        for mode in modes:
++            bundle = root / mode
++            if bundle.is_dir():
++                for path in bundle.rglob("*.md"):
++                    if path.is_file():
++                        result[path] = mode
++        return result
++
++    async def cmd_reindex(self, update, context):
++        message = update.effective_message
++        if not self._is_admin(update.effective_user.id):
++            await self._send(message, t("admin.denied"))
++            return
++        try:
++            counts = await self.coordinator.ingest(
++                self.collect_sources(self.modes_directory, self.config["modes"]))
++            self.runtime_state["last_reindex"] = datetime.now(timezone.utc).isoformat()
++            await self._send(message, t("reindex.completed", documents=sum(counts.values())))
++        except Exception:
++            logger.error("reindex failed")
++            await self._send(message, t("reindex.failed"))
++
++    async def cmd_status(self, update, context):
++        message = update.effective_message
++        if not self._is_admin(update.effective_user.id):
++            await self._send(message, t("admin.denied"))
++            return
++        try:
++            session = await self.session_manager.get_session(update.effective_user.id)
++            mode = session.get("mode", self.DEFAULT_MODE)
++            try:
++                package_version = version("telegram-rag-bot")
++            except PackageNotFoundError:
++                package_version = "unknown"
++            try:
++                documents = int(self.rag_factory.vectorstore_provider.load_index(mode).index.ntotal)
++            except FileNotFoundError:
++                documents = 0
++            await self._send(message, t("status.summary", mode=mode, version=package_version,
++                gigachat=self.health_cache.get("gigachat", "fail"),
++                yandexgpt=self.health_cache.get("yandexgpt", "fail"), documents=documents,
++                uptime_seconds=max(0, int(time.monotonic() - self.runtime_state["started_at"])),
++                last_reindex=self.runtime_state.get("last_reindex", "never")))
++        except Exception:
++            logger.error("status unavailable")
++            await self._send(message, t("status.unavailable"))
++
++    async def _escalate(self, update, reason="explicit", query=None, top_score=None):
++        user_id = update.effective_user.id
++        message = update.effective_message
++        # Process-local serialization; the client provides no cross-pod guarantee.
++        async with self._ticket_locks.setdefault(user_id, asyncio.Lock()):
++            session = await self.session_manager.get_session(user_id)
++            operation = {"mode": session.get("mode", self.DEFAULT_MODE),
++                         "query": query if query is not None else session.get("last_query", "")}
++            if session.get("active_ticket_uuid") and session.get("ticket_operation") == operation:
++                await self._send(message, t("ticket.created", ticket_id=session["active_ticket_uuid"]))
++                return
++            if session.get("active_ticket_uuid"):
++                session["active_ticket_uuid"] = None
++                session.pop("ticket_operation", None)
++                await self.session_manager.set_session(user_id, session)
++            if self.ticket_client is None:
++                await self._send(message, t("ticket.failed"))
++                return
++            ticket = Ticket(user_id=user_id, mode=session.get("mode", self.DEFAULT_MODE),
++                query=query if query is not None else session.get("last_query", ""),
++                reason=reason, top_score=top_score)
++            try:
++                result = await self.ticket_client.create(ticket, session=session)
++            except Exception:
++                logger.error("ticket creation failed")
++                await self._send(message, t("ticket.failed"))
++                return
++            if result.success:
++                # The stable session API clears active UUID on successful creation.
++                # Persist the confirmed UUID afterwards to deduplicate later clicks.
++                await self.session_manager.record_ticket_created(user_id)
++                latest = await self.session_manager.get_session(user_id)
++                latest["active_ticket_uuid"] = result.ticket_id
++                latest["ticket_operation"] = operation
++                await self.session_manager.set_session(user_id, latest)
++                await self._send(message, t("ticket.created", ticket_id=result.ticket_id))
++            else:
++                await self._send(message, t("ticket.failed"))
++
++    def _escalation_keyboard(self):
++        return InlineKeyboardMarkup([[InlineKeyboardButton(t("ticket.escalation"),
++                                                           callback_data="ticket:explicit")]])
++
++    async def _analytics(self, mode, reason, query, score=None):
++        if self.unanswered_writer is not None:
++            try:
++                await asyncio.to_thread(self.unanswered_writer.write,
++                    UnansweredEntry(mode, reason, query, score))
++            except Exception:
++                logger.error("unanswered analytics write failed")
++
++    async def _low_score(self, update, query, mode, failure, *, observed=False):
++        if not observed:
++            RAG_SCORE.observe(failure.top_score or 0.0)
++        FALLBACK_TOTAL.labels(type="rag").inc()
++        session = await self.session_manager.record_rag_fallback(update.effective_user.id)
++        session["last_query"] = query
++        await self.session_manager.set_session(update.effective_user.id, session)
++        await self._analytics(mode, "low_score", query, failure.top_score)
++        text = t("fallback.no_answer")
++        candidates = failure.candidates[:3]
++        if candidates:
++            suggestions = [getattr(item, "page_content", str(item)) for item in candidates]
++            text += "\n" + t("fallback.suggestions_header") + "\n" + "\n".join(suggestions)
++        text += "\n" + t("fallback.escalation_offer")
++        await self._send(update.effective_message, text, reply_markup=self._escalation_keyboard())
++        if session.get("rag_fallback_streak", 0) >= 2:
++            await self._escalate(update, "fallback_x2", query, failure.top_score)
++
++    async def handle_message(self, update, context):
++        if self.coordinator is None and self.modes_directory is None:
++            return await self._legacy_handle_message(update, context)
++        if not update.effective_user or not update.message or not update.message.text:
++            return
++        query = update.message.text.strip()
++        if not query:
++            return
++        user_id = update.effective_user.id
++        session = await self.session_manager.get_session(user_id)
++        mode = session.get("mode", self.DEFAULT_MODE)
++        if mode not in self.config["modes"]:
++            mode = self.DEFAULT_MODE
++        if query == t("ticket.escalation"):
++            return await self._escalate(update, query=query)
++        if mode == "onboarding_plan":
++            session["last_query"] = query
++            await self.session_manager.set_session(user_id, session)
++            return await self._onboarding(update, query, session)
++        if session.get("last_query") != query:
++            session["active_ticket_uuid"] = None
++        session["mode"] = mode
++        session["last_query"] = query
++        await self.session_manager.set_session(user_id, session)
++        class RetrievalScore(BaseCallbackHandler):
++            observed = False
++            def on_retriever_end(self, documents, **kwargs):
++                if not self.observed:
++                    RAG_SCORE.observe(max((d.metadata.get("score", 0.0) for d in documents), default=0.0))
++                    self.observed = True
++            def on_retriever_error(self, error, **kwargs):
++                if isinstance(error, LowScoreFallback) and not self.observed:
++                    RAG_SCORE.observe(error.top_score or 0.0)
++                    self.observed = True
++        score = RetrievalScore()
++        start = time.monotonic()
++        try:
++            platform = self.config.get("platform", {})
++            if platform.get("tenant_id") and platform.get("callback_url"):
++                allowed, block_message = await check_quota_before_llm(
++                    platform["tenant_id"], platform["callback_url"])
++                if not allowed:
++                    await self._send(update.message, block_message or t("errors.access_limited"))
++                    return
++            chain = self.rag_factory.create_chain(mode)
++            with self.request_scope():
++                response = await asyncio.wait_for(asyncio.to_thread(chain.invoke,
++                    {"input": query}, config={"callbacks": [score]}),
++                    timeout=self.config["modes"][mode].get("timeout_seconds", 30))
++            docs = response.get("context", [])
++            if not score.observed:
++                score.on_retriever_end(docs)
++            answer = str(response["answer"])
++            titles = {}
++            bundle = self.modes_directory / mode
++            for path, title in self.config["modes"][mode].get("source_titles", {}).items():
++                titles[str((bundle / path).resolve())] = self._ui(title)
++                titles[path] = self._ui(title)
++            citation = extract_citation(docs, titles)
++            if citation:
++                answer += "\n\n" + t("citation.reference", source=citation.source_display, quote=citation.quote)
++            else:
++                answer += "\n\n" + t("citation.unavailable")
++            await self.session_manager.record_rag_success(user_id)
++            latest = await self.session_manager.get_session(user_id)
++            latest.update(mode=mode, last_query=query, last_answer=answer)
++            await self.session_manager.set_session(user_id, latest)
++            await self._send(update.message, answer, reply_markup=self._escalation_keyboard())
++        except LowScoreFallback as failure:
++            await self._low_score(update, query, mode, failure, observed=score.observed)
++        except asyncio.TimeoutError:
++            ERROR_COUNT.labels(error_type="timeout").inc()
++            await self._send(update.message, t("errors.timeout"))
++        except Exception:
++            ERROR_COUNT.labels(error_type="unknown").inc()
++            logger.error("HR answer failed")
++            await self._send(update.message, t("errors.general"))
++        finally:
++            QUERY_LATENCY.labels(mode=mode).observe(time.monotonic() - start)
++
++    async def _onboarding(self, update, query, session):
++        user_id = update.effective_user.id
++        profile = session.get("profile")
++        if not profile:
++            role = session.get("profile_pending_role")
++            if role is None:
++                if not session.get("profile_pending"):
++                    session["profile_pending"] = True
++                    await self.session_manager.set_session(user_id, session)
++                    await self._send(update.message, t("profile.ask_role"))
++                    return
++                if not re.fullmatch(r"[a-z0-9_-]+", query):
++                    await self._send(update.message, t("profile.invalid"))
++                    return
++                session["profile_pending_role"] = query
++                await self.session_manager.set_session(user_id, session)
++                await self._send(update.message, t("profile.ask_department"))
++                return
++            if not re.fullmatch(r"[a-z0-9_-]+", query):
++                await self._send(update.message, t("profile.invalid"))
++                return
++            session = await self.session_manager.set_profile(user_id, role, query)
++            session.pop("profile_pending", None)
++            session.pop("profile_pending_role", None)
++            await self.session_manager.set_session(user_id, session)
++            profile = session["profile"]
++        role, department = profile["role"], profile["department"]
++        if not all(isinstance(x, str) and re.fullmatch(r"[a-z0-9_-]+", x) for x in (role, department)):
++            await self._send(update.message, t("profile.invalid"))
++            return
++        bundle = (self.modes_directory / "onboarding_plan").resolve()
++        directory = (bundle / self.config["modes"]["onboarding_plan"].get("plans_directory", "plans")).resolve()
++        if not directory.is_relative_to(bundle):
++            await self._send(update.message, t("errors.configuration"))
++            return
++        def read(name):
++            path = (directory / name).resolve()
++            if path.is_relative_to(directory) and path.is_relative_to(bundle) and path.is_file():
++                return path.read_text(encoding="utf-8")
++            return None
++        plan = read(f"{role}__{department}.md") or read(f"{role}.md")
++        if plan:
++            await self._send(update.message, t("plan.title", role=role, department=department) + "\n" + plan)
++            return
++        session = await self.session_manager.get_session(user_id)
++        session["mode"] = "onboarding_plan"
++        session["last_query"] = f"onboarding_plan:{role}/{department}"
++        await self.session_manager.set_session(user_id, session)
++        await self._analytics("onboarding_plan", "missing_plan", f"{role}/{department}")
++        text = t("plan.not_configured")
++        default = read("default.md")
++        if default:
++            text += "\n" + t("plan.default") + "\n" + default
++        text += "\n" + t("plan.escalation_offer")
++        await self._send(update.message, text, reply_markup=self._escalation_keyboard())
++
++    async def _hr_callback(self, update, context):
++        data = update.callback_query.data
++        if data in {"diag:escalate", "ticket:explicit"}:
++            return await self._escalate(update)
++        graph = self.diagnostics_graph
++        if graph is None:
++            await self._send(update.effective_message, t("diagnostics.unavailable"))
++            return
++        user_id = update.effective_user.id
++        session = await self.session_manager.get_session(user_id)
++        try:
++            if data.startswith("diag:start:"):
++                scenario = data.split(":", 2)[2]
++                node = graph.scenarios[scenario]["start"]
++                state = dict(scenario=scenario, node=node,
++                             started_at=datetime.now(timezone.utc).isoformat())
++            else:
++                state = dict(session["diagnostics_state"])
++                scenario = state["scenario"]
++                node = graph.step(scenario, state["node"], int(data.split(":")[2]))
++                state["node"] = node if isinstance(node, str) else state["node"]
++            current = graph.scenarios[scenario]["nodes"][node] if isinstance(node, str) else node
++            buttons = []
++            if current["type"] == "terminal":
++                ref = current["faq_ref"]
++                filename, anchor = ref.split("#", 1)
++                if filename != "faq.md" or not re.fullmatch(r"[a-z0-9_-]+", anchor):
++                    raise ValueError("invalid FAQ reference")
++                root = (self.modes_directory / "it_support").resolve()
++                path = (root / filename).resolve()
++                if not path.is_relative_to(root):
++                    raise ValueError("unsafe FAQ path")
++                faq = path.read_text(encoding="utf-8")
++                match = re.search(r'<a\s+(?:id|name)=["\']' + re.escape(anchor) + r'["\'][^>]*>.*?</a>(.*?)(?=<a\s+(?:id|name)=|\Z)', faq, re.S)
++                if not match:
++                    raise ValueError("missing FAQ anchor")
++                text = self._ui(current["label_key"]) + "\n" + match.group(1).strip()
++                session["diagnostics_state"] = None
++            else:
++                text = self._ui(current["question_key"])
++                for index, choice in enumerate(current["choices"]):
++                    buttons.append([InlineKeyboardButton(self._ui(choice["label_key"]), callback_data=f"diag:choice:{index}")])
++                session["diagnostics_state"] = state
++            buttons.append([InlineKeyboardButton(self._ui(current["escalation"]["label_key"]), callback_data="diag:escalate")])
++            session["mode"] = "it_support"
++            session["last_query"] = "diagnostics:" + scenario
++            await self.session_manager.set_session(user_id, session)
++            await self._send(update.effective_message, text, reply_markup=InlineKeyboardMarkup(buttons))
++        except (KeyError, ValueError, TypeError, OSError):
++            await self._send(update.effective_message, t("diagnostics.invalid_choice"))
++
++
++    async def cmd_escalate(self, update, context):
++        await self._escalate(update)
++
++    async def cmd_diagnostics(self, update, context):
++        session = await self.session_manager.get_session(update.effective_user.id)
++        session["mode"] = "it_support"
++        session["last_query"] = "diagnostics"
++        await self.session_manager.set_session(update.effective_user.id, session)
++        keyboard = [[InlineKeyboardButton(t("diagnostics.vpn.title"), callback_data="diag:start:vpn")],
++                    [InlineKeyboardButton(t("diagnostics.mail.title"), callback_data="diag:start:mail")],
++                    [InlineKeyboardButton(t("ticket.escalation"), callback_data="diag:escalate")]]
++        await self._send(update.effective_message, t("diagnostics.choose"),
++                         reply_markup=InlineKeyboardMarkup(keyboard))
+--- a/workspace/telegram-rag-bot-src/pyproject.toml
++++ b/workspace/telegram-rag-bot-src/pyproject.toml
+@@ -81,3 +81,13 @@
+ 
+ [tool.setuptools.exclude-package-data]
+ "*" = ["__pycache__", "*.pyc", "*.pyo", "*.orig", "*.rej", "*.bak"]
++
++[tool.pytest.ini_options]
++testpaths = ["tests", "../../.agent/artifacts/backend_rest_core_checks", "../../.agent/artifacts/backend_rest_adapters_checks", "../../.agent/artifacts/backend_rest_wiring_checks"]
++asyncio_mode = "auto"
++addopts = "-p no:cacheprovider"
++
++[tool.coverage.run]
++source = ["telegram_rag_bot"]
++# Provisional external-provider boundary; mockability/omission reconsidered in i18n.
++omit = ["*/__main__.py", "*/tests/*", "*/migrations/*", "*/langchain_adapter/rag_chains.py"]

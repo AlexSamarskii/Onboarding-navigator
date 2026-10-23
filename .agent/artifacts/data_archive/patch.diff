@@ -1,0 +1,370 @@
+--- a/config/modes/it_support/mode.yaml
++++ b/config/modes/it_support/mode.yaml
+@@ -1,8 +1,12 @@
+ name: it_support
+-display_name: "IT Support FAQ"
+-description: "Ответы на вопросы IT-поддержки"
++display_name: mode.it_support
++description: Ответы на вопросы IT-поддержки
+ enabled: true
+ files:
+-  system_prompt: "system_prompt.md"
+-  faq: "faq.md"
++  system_prompt: system_prompt.md
++  faq: faq.md
+ timeout_seconds: 30
++source_titles:
++  faq.md: mode.it_support
++  system_prompt.md: mode.it_support
++diagnostics_file: diagnostics.yaml
+--- a/config/modes/it_support/system_prompt.md
++++ b/config/modes/it_support/system_prompt.md
+@@ -1 +1,9 @@
+ Ты IT-специалист. Отвечай на вопросы сотрудников, используя FAQ.
++
++Используй только переданный контекст FAQ, планов и политик выбранного режима.
++Все материалы этого bundle — обезличенные демонстрационные примеры, не реальные правила работодателя. Явно сообщай об этом при ответе.
++Не придумывай факты, контакты, суммы, ссылки и цитаты. Если подтверждения нет, сообщи об отсутствии ответа и предложи эскалацию.
++Не запрашивай пароли и токены, не выполняй команды, покупки или изменения HR-данных.
++Не утверждай, что заявка создана, пока адаптер не подтвердил создание. Данные профиля сообщает пользователь; доступа к HR-системе нет.
++Для цитирования используй только дословный фрагмент реально переданного контекста; не выдумывай источник.
++Диагностические вопросы задаёт только детерминированный YAML-диалог; не сочиняй дополнительные развилки.
+--- a/config/modes/it_support/faq.md
++++ b/config/modes/it_support/faq.md
+@@ -1,3 +1,17 @@
+ # IT FAQ
+ ## Как сбросить пароль VPN?
+ Обратитесь в IT-поддержку...
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++<a id="vpn-connect"></a>
++## Как подключиться к VPN?
++Демо-инструкция: используйте корпоративный клиент VPN из https://it.example.invalid/vpn. Если клиент не установлен или соединение не работает, обратитесь в контакт IT: it@example.invalid. Если подключение работает, дополнительных действий не требуется.
++
++<a id="mail-delivery"></a>
++## Не приходит письмо на корпоративную почту
++Демо-инструкция: проверьте папку «Спам» и квоту почтового ящика. Если письмо найдено в спаме, отметьте его как нужное; при заполненной квоте уточните очистку у IT; если письма нет и квота свободна, обратитесь в контакт IT: it@example.invalid.
++
++<a id="git-access"></a>
++## Как получить доступ к Git?
++Демо-инструкция: оформите заявку на Git-доступ через https://it.example.invalid/access и получите согласование руководителя. Контакт IT: it@example.invalid.
+--- /dev/null
++++ b/config/modes/it_support/diagnostics.yaml
+@@ -0,0 +1,96 @@
++version: 1
++scenarios:
++  vpn:
++    title_key: diagnostics.vpn.title
++    start: client
++    nodes:
++      client:
++        type: question
++        question_key: diagnostics.vpn.client_question
++        choices:
++        - label_key: diagnostics.vpn.client_installed
++          next: connection
++        - label_key: diagnostics.vpn.client_missing
++          next: install
++        escalation:
++          label_key: diagnostics.vpn.escalation
++          action: escalate
++      connection:
++        type: question
++        question_key: diagnostics.vpn.connection_question
++        choices:
++        - label_key: diagnostics.vpn.connected
++          next: ready
++        - label_key: diagnostics.vpn.connection_failed
++          next: contact
++        escalation:
++          label_key: diagnostics.vpn.escalation
++          action: escalate
++      install:
++        type: terminal
++        label_key: diagnostics.vpn.client_missing
++        faq_ref: faq.md#vpn-connect
++        escalation:
++          label_key: diagnostics.vpn.escalation
++          action: escalate
++      ready:
++        type: terminal
++        label_key: diagnostics.vpn.connected
++        faq_ref: faq.md#vpn-connect
++        escalation:
++          label_key: diagnostics.vpn.escalation
++          action: escalate
++      contact:
++        type: terminal
++        label_key: diagnostics.vpn.connection_failed
++        faq_ref: faq.md#vpn-connect
++        escalation:
++          label_key: diagnostics.vpn.escalation
++          action: escalate
++  mail:
++    title_key: diagnostics.mail.title
++    start: spam
++    nodes:
++      spam:
++        type: question
++        question_key: diagnostics.mail.spam_question
++        choices:
++        - label_key: diagnostics.mail.spam_found
++          next: found
++        - label_key: diagnostics.mail.spam_missing
++          next: quota
++        escalation:
++          label_key: diagnostics.mail.escalation
++          action: escalate
++      quota:
++        type: question
++        question_key: diagnostics.mail.quota_question
++        choices:
++        - label_key: diagnostics.mail.quota_full
++          next: full
++        - label_key: diagnostics.mail.quota_available
++          next: contact
++        escalation:
++          label_key: diagnostics.mail.escalation
++          action: escalate
++      found:
++        type: terminal
++        label_key: diagnostics.mail.spam_found
++        faq_ref: faq.md#mail-delivery
++        escalation:
++          label_key: diagnostics.mail.escalation
++          action: escalate
++      full:
++        type: terminal
++        label_key: diagnostics.mail.quota_full
++        faq_ref: faq.md#mail-delivery
++        escalation:
++          label_key: diagnostics.mail.escalation
++          action: escalate
++      contact:
++        type: terminal
++        label_key: diagnostics.mail.quota_available
++        faq_ref: faq.md#mail-delivery
++        escalation:
++          label_key: diagnostics.mail.escalation
++          action: escalate
+--- /dev/null
++++ b/config/modes/benefits/mode.yaml
+@@ -0,0 +1,12 @@
++name: benefits
++display_name: mode.benefits
++description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
++  компании.
++enabled: true
++files:
++  system_prompt: system_prompt.md
++  faq: faq.md
++timeout_seconds: 30
++source_titles:
++  faq.md: mode.benefits
++  system_prompt.md: mode.benefits
+--- /dev/null
++++ b/config/modes/benefits/system_prompt.md
+@@ -0,0 +1,8 @@
++Ты помощник Onboarding Navigator по вопросам сотрудников.
++
++Используй только переданный контекст FAQ, планов и политик выбранного режима.
++Все материалы этого bundle — обезличенные демонстрационные примеры, не реальные правила работодателя. Явно сообщай об этом при ответе.
++Не придумывай факты, контакты, суммы, ссылки и цитаты. Если подтверждения нет, сообщи об отсутствии ответа и предложи эскалацию.
++Не запрашивай пароли и токены, не выполняй команды, покупки или изменения HR-данных.
++Не утверждай, что заявка создана, пока адаптер не подтвердил создание. Данные профиля сообщает пользователь; доступа к HR-системе нет.
++Для цитирования используй только дословный фрагмент реально переданного контекста; не выдумывай источник.
+--- /dev/null
++++ b/config/modes/benefits/faq.md
+@@ -0,0 +1,15 @@
++# FAQ: benefits
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++<a id="medical-insurance"></a>
++## Какие льготы по ДМС?
++Демо-правило: полис ДМС доступен после оформления у HR. Для получения полиса обратитесь в HR-контакт: hr@example.invalid.
++
++<a id="vacation"></a>
++## Сколько дней отпуска?
++Демо-правило: ежегодный отпуск составляет 28 календарных дней. Это тестовое число, не реальная политика работодателя; уточнения — hr@example.invalid.
++
++<a id="sick-leave"></a>
++## Как оформить больничный?
++Демо-шаги: получите электронный больничный у врача, сообщите о периоде отсутствия руководителю и передайте сведения HR. HR-контакт: hr@example.invalid.
+--- /dev/null
++++ b/config/modes/learning/mode.yaml
+@@ -0,0 +1,12 @@
++name: learning
++display_name: mode.learning
++description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
++  компании.
++enabled: true
++files:
++  system_prompt: system_prompt.md
++  faq: faq.md
++timeout_seconds: 30
++source_titles:
++  faq.md: mode.learning
++  system_prompt.md: mode.learning
+--- /dev/null
++++ b/config/modes/learning/system_prompt.md
+@@ -0,0 +1,8 @@
++Ты помощник Onboarding Navigator по вопросам сотрудников.
++
++Используй только переданный контекст FAQ, планов и политик выбранного режима.
++Все материалы этого bundle — обезличенные демонстрационные примеры, не реальные правила работодателя. Явно сообщай об этом при ответе.
++Не придумывай факты, контакты, суммы, ссылки и цитаты. Если подтверждения нет, сообщи об отсутствии ответа и предложи эскалацию.
++Не запрашивай пароли и токены, не выполняй команды, покупки или изменения HR-данных.
++Не утверждай, что заявка создана, пока адаптер не подтвердил создание. Данные профиля сообщает пользователь; доступа к HR-системе нет.
++Для цитирования используй только дословный фрагмент реально переданного контекста; не выдумывай источник.
+--- /dev/null
++++ b/config/modes/learning/faq.md
+@@ -0,0 +1,15 @@
++# FAQ: learning
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++<a id="course-catalog"></a>
++## Какие курсы доступны?
++Демо-каталог курсов: https://learning.example.invalid/catalog. Выберите курс из каталога.
++
++<a id="training-approval"></a>
++## Как согласовать обучение?
++Демо-шаги согласования: выберите курс, отправьте руководителю цель и стоимость, дождитесь согласования, затем передайте заявку HR: hr@example.invalid.
++
++<a id="training-budget"></a>
++## Есть ли бюджет на обучение?
++Демо-правило: лимит обучения — 10000 условных единиц на сотрудника за календарный год после согласования руководителя. Это вымышленный тестовый лимит, не обещание выплаты.
+--- /dev/null
++++ b/config/modes/culture/mode.yaml
+@@ -0,0 +1,13 @@
++name: culture
++display_name: mode.culture
++description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
++  компании.
++enabled: true
++files:
++  system_prompt: system_prompt.md
++  faq: faq.md
++timeout_seconds: 30
++source_titles:
++  faq.md: mode.culture
++  system_prompt.md: mode.culture
++  policies/example.md: mode.culture
+--- /dev/null
++++ b/config/modes/culture/system_prompt.md
+@@ -0,0 +1,8 @@
++Ты помощник Onboarding Navigator по вопросам сотрудников.
++
++Используй только переданный контекст FAQ, планов и политик выбранного режима.
++Все материалы этого bundle — обезличенные демонстрационные примеры, не реальные правила работодателя. Явно сообщай об этом при ответе.
++Не придумывай факты, контакты, суммы, ссылки и цитаты. Если подтверждения нет, сообщи об отсутствии ответа и предложи эскалацию.
++Не запрашивай пароли и токены, не выполняй команды, покупки или изменения HR-данных.
++Не утверждай, что заявка создана, пока адаптер не подтвердил создание. Данные профиля сообщает пользователь; доступа к HR-системе нет.
++Для цитирования используй только дословный фрагмент реально переданного контекста; не выдумывай источник.
+--- /dev/null
++++ b/config/modes/culture/faq.md
+@@ -0,0 +1,15 @@
++# FAQ: culture
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++<a id="work-hours"></a>
++## Какой график работы?
++Демо-правило: гибкий график с общими часами связи 11:00–16:00; конкретное время согласуйте с руководителем.
++
++<a id="dress-code"></a>
++## Есть ли дресс-код?
++Демо-правило: повседневный аккуратный дресс-код; требования безопасности рабочего места обязательны.
++
++<a id="business-trip"></a>
++## Как оформить командировку?
++Демо-шаги: согласуйте цель и даты с руководителем, направьте заявку HR и дождитесь подтверждения. HR-контакт: hr@example.invalid.
+--- /dev/null
++++ b/config/modes/onboarding_plan/mode.yaml
+@@ -0,0 +1,16 @@
++name: onboarding_plan
++display_name: mode.onboarding_plan
++description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
++  компании.
++enabled: true
++files:
++  system_prompt: system_prompt.md
++  faq: faq.md
++timeout_seconds: 30
++source_titles:
++  faq.md: mode.onboarding_plan
++  system_prompt.md: mode.onboarding_plan
++  plans/developer.md: mode.onboarding_plan
++  plans/developer__engineering.md: mode.onboarding_plan
++  plans/default.md: mode.onboarding_plan
++plans_directory: plans
+--- /dev/null
++++ b/config/modes/onboarding_plan/system_prompt.md
+@@ -0,0 +1,9 @@
++Ты помощник Onboarding Navigator по вопросам сотрудников.
++
++Используй только переданный контекст FAQ, планов и политик выбранного режима.
++Все материалы этого bundle — обезличенные демонстрационные примеры, не реальные правила работодателя. Явно сообщай об этом при ответе.
++Не придумывай факты, контакты, суммы, ссылки и цитаты. Если подтверждения нет, сообщи об отсутствии ответа и предложи эскалацию.
++Не запрашивай пароли и токены, не выполняй команды, покупки или изменения HR-данных.
++Не утверждай, что заявка создана, пока адаптер не подтвердил создание. Данные профиля сообщает пользователь; доступа к HR-системе нет.
++Для цитирования используй только дословный фрагмент реально переданного контекста; не выдумывай источник.
++Выбирай предоставленный план роли/отдела; не выдумывай отсутствующий план и не сохраняй прогресс чеклиста.
+--- /dev/null
++++ b/config/modes/onboarding_plan/faq.md
+@@ -0,0 +1,15 @@
++# FAQ: onboarding_plan
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++<a id="profile"></a>
++## Как указать роль и отдел?
++Сообщите роль и отдел через /start или при первом обращении к плану; сведения предназначены для сессии на 24 часа, доступа к HR-системе нет.
++
++<a id="plan-selection"></a>
++## Как выбирается план онбординга?
++Сначала выбирается plans/<role>__<department>.md, затем plans/<role>.md. Для тестового профиля developer/engineering приоритетен developer__engineering.md.
++
++<a id="missing-plan"></a>
++## Что делать, если план не настроен?
++Если план не настроен, бот сообщает об этом, предлагает plans/default.md при наличии и эскалацию по подтверждению пользователя; выдуманный персональный план не выдаётся.
+--- /dev/null
++++ b/config/modes/culture/policies/example.md
+@@ -0,0 +1,5 @@
++# Пример корпоративной политики
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++Гибкий график: общие часы связи 11:00–16:00, остальное время согласуется с руководителем. Повседневный аккуратный дресс-код; требования безопасности обязательны. Командировка: согласовать цель и даты, направить заявку HR (hr@example.invalid), дождаться подтверждения.
+--- /dev/null
++++ b/config/modes/onboarding_plan/plans/developer.md
+@@ -0,0 +1,7 @@
++# Чеклист: developer
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++- [ ] Уточнить у руководителя задачи роли разработчика.
++- [ ] Изучить демо-FAQ по VPN и Git; оформить доступы через утверждённый процесс.
++- [ ] Согласовать первую учебную задачу и ревью с наставником.
+--- /dev/null
++++ b/config/modes/onboarding_plan/plans/developer__engineering.md
+@@ -0,0 +1,7 @@
++# Чеклист: developer__engineering
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++- [ ] Уточнить у руководителя engineering задачи и наставника.
++- [ ] Прочитать демо-FAQ по VPN и Git; согласовать доступ к учебному репозиторию engineering.
++- [ ] Обсудить с наставником правила ревью команды engineering.
+--- /dev/null
++++ b/config/modes/onboarding_plan/plans/default.md
+@@ -0,0 +1,7 @@
++# Чеклист: default
++
++> Обезличенные демонстрационные данные для acceptance-тестов. Это не реальные политики компании. Контакты, ссылки и числовые правила — тестовые примеры.
++
++- [ ] Уточнить роль, отдел и наставника у руководителя.
++- [ ] Ознакомиться с демо-FAQ по IT, льготам и культуре.
++- [ ] Попросить уточнение персонального плана через эскалацию.

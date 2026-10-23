@@ -1,0 +1,71 @@
+{
+  "agent": "Reviewer",
+  "review_iteration": 1,
+  "verdict": "approve",
+  "blockers": 0,
+  "major": 0,
+  "comments": [],
+  "created_at_utc": "2026-10-23T20:42:56.581012+00:00",
+  "tests_independently_rerun": "317 passed, 3 skipped",
+  "coverage_after_cleanup": 78.006,
+  "coverage_exact": 78.00627396305333,
+  "covered": 2238,
+  "statements": 2869,
+  "coverage_unchanged": true,
+  "frozen_hashes_checked": 44,
+  "unchanged": 44,
+  "historical_i18n_hashes_checked": 8,
+  "historical_i18n_unchanged": 7,
+  "authorized_B1_test_delta": "workspace/telegram-rag-bot-src/tests/test_hr_adapters.py",
+  "test_hr_acceptance_unchanged": true,
+  "G2_closed": false,
+  "original_index_mutated_by_reviewer": false,
+  "sensitive_env_paths_accessed": false,
+  "phase": "publication_prep_final",
+  "approved_scopes": [
+    "B1",
+    "B3 LOCAL",
+    "release_cleanup"
+  ],
+  "B2_separate_review": "b2_review.json",
+  "reviewed_subject_manifest_sha256": "f285845919c4a18fd247d99e67036e83fc4ef6f892b021c5d2f247e7ebc1010f",
+  "reviewed_patch_sha256": "a8a63b06d9826f2ace4886b83e1c5f4f0242f22ad417752b45627a8c2dbfa5cf",
+  "checks": [
+    "baseline-константы из before AST совпадают с JSON",
+    "нецелевые тесты семантически сохранены",
+    "4 hash pass в clone без audit copy",
+    "без orchestrator 2 source pass /2 dependency skip; mutation pass",
+    "full local317/3; coverage2238/2869 unchanged",
+    "frozen44/44; i18n7/8 плюс авторизованный B1delta",
+    "оба cloneindex без leaks и mode120000",
+    "B3 LOCAL без изменений индекса",
+    "15 Cцелей отсутствуют; gitignore байтово совпадает"
+  ],
+  "scoped_reviews": [
+    "b1_review.json",
+    "b3_review.json",
+    "../release_cleanup/review.json"
+  ],
+  "pending_environment": [
+    "AC-N01",
+    "AC-N02",
+    "AC-N08",
+    "AC-N09"
+  ],
+  "operational_limits": [
+    "Skills discovery внешними tools и запуск Windows не проверены.",
+    "Env gate подтверждён пользователем, без доступа агента к этим файлам."
+  ],
+  "metadata_only_finalization_authorized": [
+    "Удаление двух временных clone-каталогов после проверки и фиксация этого факта в report/summary.",
+    "Обновление b3_status/b3_summary ссылками на завершённые integrated checks.",
+    "Обновление subject manifest для этих отчётов с сохранением исходного manifest."
+  ],
+  "root_provenance_preserved": true,
+  "metadata_finalization_verified": true,
+  "metadata_changed_files_verified": [
+    ".agent/artifacts/release_cleanup/summary.md",
+    ".agent/artifacts/publication_prep/b3_summary.md"
+  ],
+  "temporary_clones_removed_verified": true
+}

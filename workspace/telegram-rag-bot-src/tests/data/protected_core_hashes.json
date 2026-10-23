@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-10-23T20:21:35.279919Z",
+  "upstream_version": "telegram-rag-bot==0.14.6",
+  "orchestrator_version": "0.9.1",
+  "files": [
+    {
+      "id": "src_rag_chains",
+      "path": "workspace/telegram-rag-bot-src/telegram_rag_bot/langchain_adapter/rag_chains.py",
+      "location": "src",
+      "sha256": "929918df28c47e5013b97d61d1295a082c15de946749578f61b4247d9e6f0141"
+    },
+    {
+      "id": "src_local_faiss",
+      "path": "workspace/telegram-rag-bot-src/telegram_rag_bot/vectorstore/local_faiss.py",
+      "location": "src",
+      "sha256": "f7bb18e7d83377f817bf6818685ac16eda88ab4759026c1131883c30b001f301"
+    },
+    {
+      "id": "dep_orchestrator_router",
+      "path": "workspace/telegram-rag-bot/orchestrator/router.py",
+      "location": "dependency",
+      "sha256": "ae69fefa5d9a5573bd68de1394190097a99f2fcd1457db26c084799055e4093a",
+      "module": "orchestrator.router"
+    },
+    {
+      "id": "dep_orchestrator_async_faiss",
+      "path": "workspace/telegram-rag-bot/orchestrator/retrieval/async_faiss.py",
+      "location": "dependency",
+      "sha256": "c857bc9d5b4f2d1ce0f1b795bb28891d9c99461b65ebfb8f7fd679a1137b0b13",
+      "module": "orchestrator.retrieval.async_faiss"
+    }
+  ]
+}

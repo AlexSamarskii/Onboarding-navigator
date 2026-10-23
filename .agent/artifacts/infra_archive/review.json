@@ -1,0 +1,148 @@
+{
+  "agent": "Reviewer",
+  "subzone": "infra",
+  "status": "ok",
+  "verdict": "approve",
+  "review_round": 1,
+  "review_limit": 3,
+  "reviewer_context_id": "/root/reviewer_infra",
+  "blockers": 0,
+  "major": 0,
+  "minor": 0,
+  "comments": [],
+  "reviewed_subject": {
+    "manifest": ".agent/artifacts/infra_subject_manifest.json",
+    "patch_sha256": "b8e3a8fc2d40be2af60f4c7d29446763649dcbd8475b9ce0b9b4a9c8c3c6c8a2",
+    "content_digests": {
+      "Dockerfile": "5082db01ce3da36820281c603776e728dca9d165bb100633f6a7aedf91308154",
+      ".dockerignore": "3294cce5a2e2b9fb802e9984f790e492d51f671a24987683f2a907d27face3c4",
+      ".gitignore": "c4f1c5ea8174dfc7a71d938e77b739ca1772ae009101f272f4187e2956c2e2a5",
+      "deploy/k8s/deployment.yaml": "d34a8deae7a8079b9edc0cc74a16d86b5911c5395fe0bc8c5d93d1b47b0f0dc5",
+      "tests/load/run_baseline.py": "81f1af098c175c0efedb007cc75e030e06e90f0b67e46aaa5e137d68a8166ade",
+      "deploy/build_config_overlay.py": "d8b044274c9aec09b60f8977e59ea9b2fcbae107b3ece9e3db3794f8f7c33b9d",
+      ".agent/artifacts/infra_checks/test_dockerfile_syntax.py": "429c832f0df786b628478f8676f474c7450100682314f0398835f1dd2e242279",
+      ".agent/artifacts/infra_checks/test_image_config_overlay.py": "c4a2601fa0a1968b8dd899d3940eb8836f05cd691ccdaf2a289f496f0b0f927d",
+      ".agent/artifacts/infra_checks/test_k8s_manifest.py": "fce1d3da6f0f6c7b2c43f306c4e484aa87521aa098025c1d5dcd5a9326e3ffdc",
+      ".agent/artifacts/infra_checks/test_load_runner_dry_run.py": "1af46749cc5c5096ee7fff2da47e165b432ba62cbb659820dbb706932557cce9",
+      ".agent/artifacts/infra_checks/test_load_runner_sampling_determinism.py": "ffd1bf908801297275b1e259e3909dab0ae57c090ed868d15ce784aac6613da1"
+    },
+    "all_digests_match": true
+  },
+  "ac_check": [
+    {
+      "ac": "AC-N01",
+      "status": "risk",
+      "reason": "requires real load environment; reproducible runner provided at tests/load/run_baseline.py; no code defect. Operator-supplied POST completion bridge must return matching request_id and telegram_e2e_completed=true after Telegram reply; frozen app exposes no query endpoint."
+    },
+    {
+      "ac": "AC-N02",
+      "status": "risk",
+      "environment_status": "blocked",
+      "reason": "requires /debug/rag_latency endpoint not in current frozen app; --rag-only exits 2 honestly; separate small PR or out-of-band profiling required. Expected threshold is 200ms."
+    },
+    {
+      "ac": "AC-N08",
+      "status": "risk",
+      "reason": "validated offline; real build/deploy requires external environment"
+    },
+    {
+      "ac": "AC-N09",
+      "status": "risk",
+      "reason": "validated offline; real build/deploy requires external environment; kubeconform absent, structural assertions passed"
+    },
+    {
+      "ac": "AC-N10",
+      "status": "ok",
+      "reason": "Source coverage 2238/2869 = 78.00627396305333%; totals and all 28 per-file coverage records exactly equal accepted baseline."
+    }
+  ],
+  "checks": {
+    "independent_infra_pytest": {
+      "passed": 20,
+      "skipped": 1,
+      "failed": 0,
+      "command": "env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=workspace/telegram-rag-bot-src:. .venv/bin/python -B -m pytest .agent/artifacts/infra_checks -q -p no:cacheprovider --basetemp=/tmp/hr_bot_infra_reviewer_final",
+      "skip_reason": "kubeconform not installed; schema validated offline by structure assertions above"
+    },
+    "implementation_source_coverage_guard": {
+      "passed": 316,
+      "skipped": 3,
+      "report": ".agent/artifacts/infra_checks/coverage.json",
+      "covered_lines": 2238,
+      "num_statements": 2869,
+      "percent_covered": 78.00627396305333,
+      "independent_report_comparison": "totals and every files record exactly equal backend_rest_i18n_checks/coverage.json"
+    },
+    "frozen_hashes": "Independent SHA256 comparison of all 44 frozen paths and 8 accepted i18n paths matches infra_snapshot.json",
+    "config_overlay": "Existing/absent HTTP mapping, invalid types, Unicode/order, idempotence, retained settings, internal reload/postverify and Docker separate postassert checked; negative mutation controls pass",
+    "load_runner": "1000 unique IDs from3000 offered;84/83 strata;seed determinism; sorted[950]; errors+inf; scheduled-start latency includes queue delay; no dry-run HTTP; no app imports",
+    "scope": "Only six authorized infra source additions and five artifact check modules in patch; all digests and patch SHA256 verified",
+    "not_executed": [
+      "real HTTP/LLM/Redis/Telegram",
+      "Docker daemon/build/run",
+      "Kubernetes cluster/deploy",
+      "real load",
+      "full offline Kubernetes JSON-schema validation (tool absent)"
+    ]
+  },
+  "coverage_unchanged": true,
+  "frozen_hashes_checked": 44,
+  "unchanged": 44,
+  "accepted_i18n_hashes_checked": 8,
+  "accepted_i18n_unchanged": 8,
+  "pending_environment": [
+    {
+      "ac": "AC-N08",
+      "commands": [
+        "docker build -t onboarding-navigator .",
+        "docker run --rm --env-file .env -p 8080:8080 onboarding-navigator",
+        "curl -f http://127.0.0.1:8080/health",
+        "docker run --rm onboarding-navigator python -c \"import yaml; c=yaml.safe_load(open('/app/config/config.yaml')); assert c['http_server']['port']==8080\""
+      ],
+      "expected": "HTTP 200, container healthy"
+    },
+    {
+      "ac": "AC-N09",
+      "commands": [
+        "kubectl apply -f deploy/k8s/deployment.yaml",
+        "kubectl rollout status deployment/onboarding-navigator --timeout=120s",
+        "kubectl get pods -l app=onboarding-navigator"
+      ],
+      "expected": "1/1 Running",
+      "prerequisites": [
+        "operator-provisioned telegram-secrets",
+        "image available in cluster"
+      ]
+    },
+    {
+      "ac": "AC-N01",
+      "commands": [
+        "python tests/load/run_baseline.py --target-url <REAL_URL> --rps 10 --duration 300 --samples 1000 --seed 0 --telegram-e2e --out artifacts/ac_n01"
+      ],
+      "expected": "artifacts/ac_n01/summary.json p95_telegram_e2e_ms <= 3000",
+      "prerequisites": [
+        "real load environment and external Telegram completion bridge",
+        "1000 chunks and approved pod profile"
+      ]
+    },
+    {
+      "ac": "AC-N02",
+      "status": "blocked",
+      "command": "python tests/load/run_baseline.py --rag-only",
+      "expected": "exit 2 until endpoint or out-of-band profiler available",
+      "reason": "requires /debug/rag_latency endpoint not in current frozen app",
+      "options": [
+        "separate small PR adding endpoint (out of infra scope)",
+        "out-of-band py-spy/pyinstrument profiling on real environment"
+      ]
+    }
+  ],
+  "pending_environment_commands_executed": false,
+  "g2_closed": false,
+  "provisional_findings_resolved": [
+    "Load worker capacity and scheduled-start timing corrected to avoid hidden queue latency",
+    "Dry-run RAG threshold corrected from700ms to accepted AC-N02 200ms; acceptance assertion added"
+  ],
+  "artifact_ref": ".agent/artifacts/review.json",
+  "notes": "Independent infra review approves offline implementation only. No live build/deploy/load claim. G2 remains open. implementation_note.md contains required pending_environment_reproduction YAML."
+}

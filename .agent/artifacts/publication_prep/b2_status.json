@@ -1,0 +1,14 @@
+{
+  "agent": "Orchestrator",
+  "status": "need_info",
+  "phase": "B2/proposal",
+  "artifact_ref": ".agent/artifacts/publication_prep/b2_proposal.md",
+  "notes": "Inventory and alternatives prepared, migration not started. Cleanup C/D approval retained; B1/B3 deferred per requested order. Source63hashes and originalignore unchanged; G2 open.",
+  "questions": [
+    "Выберите A/B/C для B2; рекомендуется C с сохранением исторических артефактов и точечными runtime-ignore правилами."
+  ],
+  "cleanup_C_D_approved": true,
+  "user_selected_variant": null,
+  "proposal_review": "b2_proposal_review.json",
+  "proposal_sha256": "f54969b974e361958d12e7026550da705cc740573626dabd9a26fc286b49b197"
+}

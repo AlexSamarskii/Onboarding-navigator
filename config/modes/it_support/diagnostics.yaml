@@ -1,0 +1,96 @@
+version: 1
+scenarios:
+  vpn:
+    title_key: diagnostics.vpn.title
+    start: client
+    nodes:
+      client:
+        type: question
+        question_key: diagnostics.vpn.client_question
+        choices:
+        - label_key: diagnostics.vpn.client_installed
+          next: connection
+        - label_key: diagnostics.vpn.client_missing
+          next: install
+        escalation:
+          label_key: diagnostics.vpn.escalation
+          action: escalate
+      connection:
+        type: question
+        question_key: diagnostics.vpn.connection_question
+        choices:
+        - label_key: diagnostics.vpn.connected
+          next: ready
+        - label_key: diagnostics.vpn.connection_failed
+          next: contact
+        escalation:
+          label_key: diagnostics.vpn.escalation
+          action: escalate
+      install:
+        type: terminal
+        label_key: diagnostics.vpn.client_missing
+        faq_ref: faq.md#vpn-connect
+        escalation:
+          label_key: diagnostics.vpn.escalation
+          action: escalate
+      ready:
+        type: terminal
+        label_key: diagnostics.vpn.connected
+        faq_ref: faq.md#vpn-connect
+        escalation:
+          label_key: diagnostics.vpn.escalation
+          action: escalate
+      contact:
+        type: terminal
+        label_key: diagnostics.vpn.connection_failed
+        faq_ref: faq.md#vpn-connect
+        escalation:
+          label_key: diagnostics.vpn.escalation
+          action: escalate
+  mail:
+    title_key: diagnostics.mail.title
+    start: spam
+    nodes:
+      spam:
+        type: question
+        question_key: diagnostics.mail.spam_question
+        choices:
+        - label_key: diagnostics.mail.spam_found
+          next: found
+        - label_key: diagnostics.mail.spam_missing
+          next: quota
+        escalation:
+          label_key: diagnostics.mail.escalation
+          action: escalate
+      quota:
+        type: question
+        question_key: diagnostics.mail.quota_question
+        choices:
+        - label_key: diagnostics.mail.quota_full
+          next: full
+        - label_key: diagnostics.mail.quota_available
+          next: contact
+        escalation:
+          label_key: diagnostics.mail.escalation
+          action: escalate
+      found:
+        type: terminal
+        label_key: diagnostics.mail.spam_found
+        faq_ref: faq.md#mail-delivery
+        escalation:
+          label_key: diagnostics.mail.escalation
+          action: escalate
+      full:
+        type: terminal
+        label_key: diagnostics.mail.quota_full
+        faq_ref: faq.md#mail-delivery
+        escalation:
+          label_key: diagnostics.mail.escalation
+          action: escalate
+      contact:
+        type: terminal
+        label_key: diagnostics.mail.quota_available
+        faq_ref: faq.md#mail-delivery
+        escalation:
+          label_key: diagnostics.mail.escalation
+          action: escalate

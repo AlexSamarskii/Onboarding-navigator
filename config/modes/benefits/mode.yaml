@@ -1,0 +1,12 @@
+name: benefits
+display_name: mode.benefits
+description: Обезличенный демонстрационный режим HR-поддержки; не реальная политика
+  компании.
+enabled: true
+files:
+  system_prompt: system_prompt.md
+  faq: faq.md
+timeout_seconds: 30
+source_titles:
+  faq.md: mode.benefits
+  system_prompt.md: mode.benefits

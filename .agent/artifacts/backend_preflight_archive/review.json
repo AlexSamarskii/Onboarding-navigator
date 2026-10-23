@@ -1,0 +1,48 @@
+{
+  "verdict": "approve",
+  "comments": [],
+  "ac_check": [
+    {"ac": "AC-C02", "status": "ok"},
+    {"ac": "AC-C03", "status": "ok"},
+    {"ac": "AC-C04", "status": "ok"},
+    {"ac": "AC-C05", "status": "ok"},
+    {"ac": "AC-C06", "status": "ok"},
+    {"ac": "AC-C07", "status": "risk"},
+    {"ac": "AC-S4", "status": "risk"},
+    {"ac": "AC-S6", "status": "risk"},
+    {"ac": "AC-S7", "status": "risk"},
+    {"ac": "AC-F03", "status": "risk"},
+    {"ac": "AC-F04", "status": "risk"},
+    {"ac": "AC-F05", "status": "risk"},
+    {"ac": "AC-N03", "status": "risk"},
+    {"ac": "AC-O01", "status": "risk"},
+    {"ac": "AC-U01", "status": "risk"},
+    {"ac": "AC-U02", "status": "risk"}
+  ],
+  "review_iteration": 1,
+  "review_fix_limit": 3,
+  "scope": {
+    "stage": "G2/backend-preflight only",
+    "files": [
+      "config/config.yaml",
+      "config/i18n/ru.yaml",
+      "workspace/telegram-rag-bot-src/telegram_rag_bot/i18n.py"
+    ],
+    "interpretation": "Approval covers only the authorized configuration, RU UI catalog and generic locale helper. AC status ok denotes compliance within this patch, not end-to-end acceptance or a full G2 pass."
+  },
+  "verification": {
+    "patch": "Exactly three additions; inspected actual files match patch content.",
+    "config": "Parsed config matches the explicit requested settings, ordered providers and literal environment placeholders.",
+    "catalog": "Exact requested messages present; diagnostic questions, choices, escalation, profile, fallback, ticketing, reindex, status, citation and legacy UI flows represented. No EN locale added.",
+    "helper": "Safe YAML loading, validated dotted lookup, named interpolation, escaped braces, explicit errors, failed-load atomicity, deep-copy isolation and no locale I/O on import.",
+    "independent_test_rerun": "33 passed, 0 failed, 0 skipped; offline, bytecode/cache disabled.",
+    "report": ".agent/artifacts/backend_preflight_checks/reviewer_report.xml"
+  },
+  "deferred_risks": [
+    "AC-C07 is only partially delivered: handler/ModeLoader migration and their Cyrillic-literal AST acceptance test remain backend-rest work.",
+    "The requested minimal preflight config is not yet sufficient for the baseline ConfigLoader application startup contract; backend-rest wiring and validation are intentionally deferred.",
+    "UI strings and configuration do not implement AC-S4/S6/S7, admin authorization, webhook retries, LLM routing, diagnostics or provenance verification. Their end-to-end acceptance remains unverified.",
+    "Data-zone diagnostics YAML must reference the new RU catalog keys; all-path diagnostics integration and U01 12/12 positives remain future acceptance checks.",
+    "Coverage, performance, deployment and full G2 acceptance are outside this three-file review and have not been certified."
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "agent": "Reviewer",
+  "review_iteration": 1,
+  "verdict": "approve",
+  "blockers": 0,
+  "major": 0,
+  "comments": [],
+  "created_at_utc": "2026-10-23T20:42:56.581012+00:00",
+  "tests_independently_rerun": "317 passed, 3 skipped",
+  "coverage_after_cleanup": 78.006,
+  "coverage_exact": 78.00627396305333,
+  "covered": 2238,
+  "statements": 2869,
+  "coverage_unchanged": true,
+  "frozen_hashes_checked": 44,
+  "unchanged": 44,
+  "historical_i18n_hashes_checked": 8,
+  "historical_i18n_unchanged": 7,
+  "authorized_B1_test_delta": "workspace/telegram-rag-bot-src/tests/test_hr_adapters.py",
+  "test_hr_acceptance_unchanged": true,
+  "G2_closed": false,
+  "original_index_mutated_by_reviewer": false,
+  "sensitive_env_paths_accessed": false,
+  "phase": "B3",
+  "user_selected_variant": "LOCAL: сохранить ignore, индекс не трогать",
+  "selection_explicit": true,
+  "classification_independently_confirmed": {
+    "A_secrets": false,
+    "B_private_paths": false,
+    "C_private_urls": false,
+    "D_generic": true
+  },
+  "values_emitted": false,
+  "file_remains_on_disk": true,
+  "file_absent_index": true,
+  "ignored": true,
+  "git_rm_cached_required": false,
+  "notes": [
+    "Историческая рекомендация KEEP не подменяет окончательный выбор пользователя.",
+    "Значения конфигурации не выводились; reviewer подтвердил только категории и имена ключей."
+  ]
+}

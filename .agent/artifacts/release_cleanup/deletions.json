@@ -1,0 +1,88 @@
+{
+  "user_approved_15_targets": true,
+  "outside_tmp_trb_sdist_approval": true,
+  "preflight_sizes_exact": true,
+  "backup": "/tmp/release_cleanup_C_backup_20261023T202610Z.tar.gz",
+  "backup_sha256": "b31699652c1a4d4cacd11cd12ff36a1804d9e6b0c9c57546b1d926875eb7a4c3",
+  "backup_regular_files_verified": 508,
+  "backup_symlinks_verified": 157,
+  "targets": [
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "before_du": "164K\t.agent/artifacts/backend_rest_adapters_checks/reviewer_tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_adapters_checks/tmp",
+      "before_du": "168K\t.agent/artifacts/backend_rest_adapters_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_wiring_checks/tmp",
+      "before_du": "0B\t.agent/artifacts/backend_rest_wiring_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/g0_reaudit/tmp",
+      "before_du": "0B\t.agent/artifacts/g0_reaudit/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "before_du": "44K\t.agent/artifacts/backend_rest_i18n_checks/tmp_acceptance",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "before_du": "28K\t.agent/artifacts/backend_rest_i18n_checks/tmp_adapters",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp",
+      "before_du": "632K\t.agent/artifacts/backend_rest_i18n_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "before_du": "356K\t.agent/artifacts/backend_rest_i18n_checks/tmp_coverage",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "before_du": "52K\t.agent/artifacts/backend_rest_i18n_checks/.coverage",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "before_du": "8.0K\t.agent/artifacts/backend_rest_i18n_checks/coverage_run.log",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_rest_core_checks/tmp",
+      "before_du": "676K\t.agent/artifacts/backend_rest_core_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/infra_checks/tmp",
+      "before_du": "780K\t.agent/artifacts/infra_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "before_du": "72K\t.agent/artifacts/backend_preflight_checks/reviewer_tmp",
+      "removed": true
+    },
+    {
+      "path": ".agent/artifacts/backend_preflight_checks/tmp",
+      "before_du": "72K\t.agent/artifacts/backend_preflight_checks/tmp",
+      "removed": true
+    },
+    {
+      "path": "/tmp/trb-sdist",
+      "before_du": "120K\t/tmp/trb-sdist",
+      "removed": true
+    }
+  ],
+  "deleted": 15,
+  "source_modified_by_cleanup": false
+}

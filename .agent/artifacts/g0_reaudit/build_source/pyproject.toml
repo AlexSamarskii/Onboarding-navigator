@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telegram-rag-bot"
+# IMPORTANT: Keep version in sync with telegram_rag_bot/__init__.py
+version = "0.14.6"
+description = "Production-ready Telegram FAQ bot with Russian LLMs, RAG, and multi-provider fallback"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+# Note: License classifiers deprecated, using SPDX expression above
+authors = [
+    {name = "Mikhail Malorod", email = "secretbox3@gmail.com"}
+]
+keywords = [
+    "telegram", "bot", "chatbot", "rag", "langchain", 
+    "llm", "gigachat", "yandexgpt", "faiss", "opensearch"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Communications :: Chat",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "multi-llm-orchestrator[langchain,retrieval]>=0.9.0,<1.0.0",
+    "langchain>=1.0",
+    "langchain-classic>=1.0,<2.0",
+    "langchain-core>=0.1.0",
+    "langchain-community>=0.0.1",
+    "langchain-text-splitters>=0.0.1",
+    "python-telegram-bot>=21.0,<22.0",
+    "faiss-cpu>=1.7.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "redis>=5.0",
+    "httpx>=0.24.0",
+    "opensearch-py>=2.3.0",
+    "aiohttp>=3.9.0",
+    "python-json-logger>=2.0.0",
+    "prometheus-client>=0.19.0,<0.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+]
+local = [
+    "sentence-transformers>=2.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MikhailMalorod/telegram-bot-universal"
+Documentation = "https://github.com/MikhailMalorod/telegram-bot-universal#readme"
+Repository = "https://github.com/MikhailMalorod/telegram-bot-universal"
+"Bug Tracker" = "https://github.com/MikhailMalorod/telegram-bot-universal/issues"
+
+[project.scripts]
+telegram-bot = "telegram_rag_bot.__main__:main"
+telegram-rag-bot = "telegram_rag_bot.__main__:main"
+
+[tool.setuptools]
+packages = {find = {}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+telegram_rag_bot = ["templates/*", "py.typed"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__", "*.pyc", "*.pyo", "*.orig", "*.rej", "*.bak"]

@@ -1,0 +1,22 @@
+{
+  "agent": "B3",
+  "status": "ok",
+  "selected_action": "LOCAL_UNSTAGE_NOOP",
+  "user_choice": "Оставить локально — сохранить ignore, индекс не трогать",
+  "file_preserved": true,
+  "file_content_unchanged": true,
+  "gitignore_changed": false,
+  "index_mutated": false,
+  "exists_in_HEAD": false,
+  "exists_in_index": false,
+  "ignored": true,
+  "git_status": "",
+  "verification_scope": "B3 local preservation; integrated tests, coverage and frozen hashes coordinated by Orchestrator",
+  "pending_verification": [],
+  "integrated_verification": {
+    "tests": "317 passed, 3 skipped",
+    "coverage_percent": 78.00627396305333,
+    "frozen_unchanged": 44,
+    "review": ".agent/artifacts/publication_prep/b3_review.json"
+  }
+}

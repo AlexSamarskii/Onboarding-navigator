@@ -1,0 +1,562 @@
+diff --git a/workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py b/workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py
+new file mode 100644
+--- /dev/null
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/citations.py
+@@ -0,0 +1,31 @@
++"""Quote only a nonempty document from the caller's already-used RAG context."""
++from dataclasses import dataclass
++from langchain_core.documents import Document
++from telegram_rag_bot.i18n import t
++
++
++@dataclass(frozen=True)
++class Citation:
++    source_display: str
++    quote: str
++
++
++def extract_citation(context: list[Document], allowed_titles: dict[str, str]) -> Citation | None:
++    """Return exact full page_content: no query or expected-fact contract exists.
++
++    A caller supplies only context actually used to answer. Unknown/missing sources
++    or empty pages cannot establish provenance and produce None. No retrieval occurs.
++    """
++    for doc in context:
++        source = doc.metadata.get('source')
++        if not isinstance(source, str) or source not in allowed_titles:
++            continue
++        title = allowed_titles[source]
++        if not isinstance(title, str) or not title.strip() or not isinstance(doc.page_content, str) or not doc.page_content.strip():
++            continue
++        try:
++            display = t(title)
++        except (KeyError, RuntimeError, ValueError):
++            display = title
++        return Citation(source_display=display, quote=doc.page_content)
++    return None
+diff --git a/workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py b/workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py
+new file mode 100644
+--- /dev/null
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/diagnostics.py
+@@ -0,0 +1,110 @@
++"""Validated deterministic diagnostic graphs; no session or LLM side effects."""
++from copy import deepcopy
++from dataclasses import dataclass
++from pathlib import Path
++import re
++import yaml
++
++
++class InvalidGraph(ValueError):
++    """A graph cannot be executed safely."""
++
++
++@dataclass(frozen=True)
++class Graph:
++    scenarios: dict
++
++    def step(self, scenario, node, choice_index):
++        current = self.scenarios[scenario]['nodes'][node]
++        if current['type'] == 'terminal':
++            return deepcopy(current)
++        if type(choice_index) is not int or not 0 <= choice_index < len(current['choices']):
++            raise ValueError('invalid diagnostic choice')
++        target = current['choices'][choice_index]['next']
++        result = self.scenarios[scenario]['nodes'][target]
++        return deepcopy(result) if result['type'] == 'terminal' else target
++
++    def escalate_available(self, node):
++        if isinstance(node, dict):
++            return node.get('escalation', {}).get('action') == 'escalate'
++        return any(node in s['nodes'] for s in self.scenarios.values())
++
++
++def load_graph(path: Path) -> Graph:
++    """Read graph and the bundle's canonical RU catalog without activating i18n."""
++    path = Path(path).resolve()
++    catalog_path = path.parent.parent.parent / 'i18n' / 'ru.yaml'
++    with catalog_path.open(encoding='utf-8') as stream:
++        catalog = yaml.safe_load(stream)
++    def key(value):
++        item = catalog
++        if not isinstance(value, str):
++            raise InvalidGraph('UI key must be a string')
++        for part in value.split('.'):
++            if not isinstance(item, dict) or part not in item:
++                raise InvalidGraph('unknown UI key')
++            item = item[part]
++        if not isinstance(item, str):
++            raise InvalidGraph('UI key must resolve to text')
++    with path.open(encoding='utf-8') as stream:
++        data = yaml.safe_load(stream)
++    if not isinstance(data, dict) or type(data.get('version')) is not int or data['version'] != 1:
++        raise InvalidGraph('version must be 1')
++    scenarios = data.get('scenarios')
++    if not isinstance(scenarios, dict) or not {'vpn', 'mail'} <= scenarios.keys():
++        raise InvalidGraph('vpn and mail are required')
++    for scenario in scenarios.values():
++        if not isinstance(scenario, dict) or not isinstance(scenario.get('nodes'), dict):
++            raise InvalidGraph('scenario needs nodes')
++        nodes = scenario['nodes']
++        start = scenario.get('start')
++        if not isinstance(start, str) or start not in nodes:
++            raise InvalidGraph('unknown start')
++        if 'title_key' in scenario:
++            key(scenario['title_key'])
++        terminals = 0
++        for name, node in nodes.items():
++            if not isinstance(name, str) or not isinstance(node, dict):
++                raise InvalidGraph('invalid node')
++            escalation = node.get('escalation')
++            if not isinstance(escalation, dict) or escalation.get('action') != 'escalate':
++                raise InvalidGraph('every node needs escalation')
++            key(escalation.get('label_key'))
++            if node.get('type') == 'question':
++                key(node.get('question_key'))
++                choices = node.get('choices')
++                if not isinstance(choices, list) or not choices:
++                    raise InvalidGraph('question needs choices')
++                for choice in choices:
++                    if not isinstance(choice, dict):
++                        raise InvalidGraph('invalid choice')
++                    key(choice.get('label_key'))
++                    if not isinstance(choice.get('next'), str) or choice['next'] not in nodes:
++                        raise InvalidGraph('unknown next node')
++            elif node.get('type') == 'terminal':
++                terminals += 1
++                key(node.get('label_key'))
++                ref = node.get('faq_ref')
++                if not isinstance(ref, str) or not re.fullmatch(r'faq\.md#[a-z0-9_-]+', ref):
++                    raise InvalidGraph('invalid FAQ reference')
++                anchor = ref.split('#')[1]
++                faq = (path.parent / 'faq.md').read_text(encoding='utf-8')
++                if not re.search(r'<a\s+(?:id|name)=["\']' + re.escape(anchor) + r'["\']', faq):
++                    raise InvalidGraph('unknown FAQ anchor')
++            else:
++                raise InvalidGraph('unknown node type')
++        seen = set()
++        def visit(name, ancestors, depth):
++            if name in ancestors:
++                raise InvalidGraph('diagnostic cycle')
++            seen.add(name)
++            node = nodes[name]
++            depth += node['type'] == 'question'
++            if depth > 3:
++                raise InvalidGraph('more than three questions')
++            for choice in node.get('choices', []):
++                visit(choice['next'], ancestors | {name}, depth)
++        visit(start, set(), 0)
++        if seen != nodes.keys() or terminals < 2:
++            raise InvalidGraph('unreachable nodes or fewer than two terminals')
++    return Graph(deepcopy(scenarios))
+diff --git a/workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py b/workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py
+new file mode 100644
+--- /dev/null
++++ b/workspace/telegram-rag-bot-src/telegram_rag_bot/hr_adapter.py
+@@ -0,0 +1,212 @@
++"""LocalFAISS-compatible score gate and atomic per-mode indexing adapter.
++
++Configure retrieval.async_mode=False so RAGChainFactory uses this facade's
++BaseRetriever. This module never replaces or mutates the factory implementation.
++"""
++import asyncio
++from copy import deepcopy
++from functools import lru_cache
++import math
++from pathlib import Path
++import re
++import shutil
++import tempfile
++from threading import RLock
++from typing import Any
++import uuid
++
++from langchain_community.vectorstores import FAISS
++from langchain_core.documents import Document
++from langchain_core.retrievers import BaseRetriever
++from langchain_text_splitters import RecursiveCharacterTextSplitter
++from telegram_rag_bot.vectorstore.local_faiss import LocalFAISSProvider
++
++
++class LowScoreFallback(ValueError):
++    def __init__(self, candidates, top_score=0.0):
++        super().__init__('retrieval did not establish sufficient relevance')
++        self.candidates = candidates
++        self.top_score = top_score
++
++
++def _mode(mode):
++    if not isinstance(mode, str) or not re.fullmatch('[a-z0-9_-]+', mode):
++        raise ValueError('invalid mode identifier')
++    return mode
++
++
++class _Retriever(BaseRetriever):
++    store: Any
++    threshold: float
++
++    def _get_relevant_documents(self, query, *, run_manager=None):
++        pairs = self.store.similarity_search_with_score(query, k=3)
++        # FAISS L2 has metric_type=1. Other/missing metrics fail closed.
++        if getattr(getattr(self.store, 'index', None), 'metric_type', None) != 1 or not pairs:
++            raise LowScoreFallback([], 0.0)
++        scored = []
++        for doc, distance in pairs:
++            try:
++                distance = float(distance)
++            except (ValueError, TypeError):
++                raise LowScoreFallback([], 0.0) from None
++            if not math.isfinite(distance) or distance < 0:
++                raise LowScoreFallback([], 0.0)
++            similarity = max(0.0, min(1.0, 1.0 / (1.0 + distance)))
++            scored.append((doc, similarity))
++        top = max(score for _, score in scored)
++        if top < self.threshold:
++            raise LowScoreFallback([], top)
++        return [Document(page_content=doc.page_content,
++                         metadata={**deepcopy(doc.metadata), 'score': score})
++                for doc, score in scored]
++
++
++class _Facade:
++    def __init__(self, store, threshold):
++        self.store, self.threshold = store, threshold
++
++    def __getattr__(self, name):
++        return getattr(self.store, name)
++
++    def as_retriever(self, search_kwargs=None, **kwargs):
++        if kwargs or (search_kwargs is not None and search_kwargs != {'k': 3}):
++            raise ValueError('HR retrieval requires k=3')
++        return _Retriever(store=self.store, threshold=self.threshold)
++
++
++class HRFAISSProvider(LocalFAISSProvider):
++    def __init__(self, config, embeddings_provider, *, rag_factory=None, score_threshold=None):
++        super().__init__(config, embeddings_provider)
++        threshold = config.get('score_threshold', 0.65) if score_threshold is None else score_threshold
++        if isinstance(threshold, bool) or not isinstance(threshold, (float, int)) or not math.isfinite(threshold) or not 0 <= threshold <= 1:
++            raise ValueError('invalid score threshold')
++        self.score_threshold = float(threshold)
++        self.rag_factory = rag_factory
++        self._publication_lock = RLock()
++
++    def load_index(self, mode):
++        # Hold publication lock through BOTH functools cache insertions, not just
++        # through the loader body. Otherwise a reader can reinsert an old facade
++        # after a writer has invalidated the cache at publication.
++        with self._publication_lock:
++            return self._cached_load_index(_mode(mode))
++
++    @lru_cache(maxsize=10)
++    def _cached_load_index(self, mode):
++        store = LocalFAISSProvider.load_index(self, mode)
++        return _Facade(store, self.score_threshold)
++
++    # Preserve the base provider's public cache invalidation interface.
++    load_index.cache_clear = _cached_load_index.cache_clear
++
++    def _invalidate(self):
++        LocalFAISSProvider.load_index.cache_clear()
++        self.load_index.cache_clear()
++        if self.rag_factory is not None:
++            self.rag_factory.chains.clear()
++
++    def save_index(self, vectorstore, mode):
++        """Stage fully before publication; roll back old on rename failure.
++
++        Atomicity is process-local. Independent pods require a single reindex owner
++        or shared distributed publication coordination, supplied by deployment.
++        """
++        mode = _mode(mode)
++        stage = Path(tempfile.mkdtemp(prefix='.stage-', dir=self.indices_dir))
++        target = self.indices_dir / mode
++        backup = self.indices_dir / ('.backup-' + uuid.uuid4().hex)
++        try:
++            vectorstore.save_local(str(stage))
++            with self._publication_lock:
++                had_old = target.exists()
++                if had_old:
++                    target.rename(backup)
++                try:
++                    stage.rename(target)
++                except BaseException:
++                    if had_old:
++                        backup.rename(target)
++                    raise
++                self._invalidate()
++        finally:
++            if stage.exists():
++                shutil.rmtree(stage)
++            if backup.exists() and target.exists():
++                shutil.rmtree(backup)
++
++    async def delete_index(self, mode):
++        def delete():
++            with self._publication_lock:
++                target = self.indices_dir / _mode(mode)
++                if target.exists():
++                    shutil.rmtree(target)
++                self._invalidate()
++        await asyncio.to_thread(delete)
++
++
++class IndexCoordinator:
++    """sources maps allowed file paths to mode identifiers, never to text.
++
++    Build all indices before publishing any. Each mode publishes atomically; a
++    multi-mode invocation rolls back all previously published mode indices on any
++    publication failure under the same process lock. Sources are trusted admin-owned files; deployment
++    must prohibit concurrent untrusted filesystem mutations (TOCTOU).
++    """
++    def __init__(self, provider: HRFAISSProvider, modes_directory: Path, *, chunk_size=1000, chunk_overlap=100):
++        self.provider = provider
++        self.root = Path(modes_directory).resolve(strict=True)
++        self.splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
++
++    async def ingest(self, sources: dict[Path, str]):
++        groups = {}
++        for raw_path, mode in sources.items():
++            mode = _mode(mode)
++            raw_path = Path(raw_path)
++            if '..' in raw_path.parts:
++                raise ValueError('source traversal forbidden')
++            path = raw_path.resolve(strict=True)
++            bundle = (self.root / mode).resolve(strict=True)
++            if bundle != self.root / mode or not path.is_relative_to(self.root) or path.relative_to(self.root).parts[0] != mode or not path.is_relative_to(bundle) or not path.is_file() or path.suffix != '.md':
++                raise ValueError('source must be a markdown file inside its mode bundle')
++            groups.setdefault(mode, []).append(Document(page_content=path.read_text(encoding='utf-8'), metadata={'source': str(path), 'mode': mode}))
++        # Existing provider exposes async embeddings. Reuse its stable wrapper.
++        from telegram_rag_bot.langchain_adapter.rag_chains import LangChainEmbeddingsWrapper
++        embedding = getattr(self.provider.embeddings_provider, 'model', None)
++        if not hasattr(embedding, 'embed_documents'):
++            embedding = LangChainEmbeddingsWrapper(self.provider.embeddings_provider)
++        built = {}
++        for mode, documents in groups.items():
++            chunks = self.splitter.split_documents(documents)
++            if not chunks:
++                raise ValueError('empty mode content')
++            built[mode] = await asyncio.to_thread(FAISS.from_documents, chunks, embedding)
++        def publish():
++            provider = self.provider
++            with provider._publication_lock:
++                backup_root = Path(tempfile.mkdtemp(prefix='.transaction-', dir=provider.indices_dir))
++                previous = {}
++                try:
++                    for mode in built:
++                        target = provider.indices_dir / mode
++                        previous[mode] = target.exists()
++                        if previous[mode]:
++                            shutil.copytree(target, backup_root / mode)
++                    published = []
++                    try:
++                        for mode, store in built.items():
++                            provider.save_index(store, mode)
++                            published.append(mode)
++                    except BaseException:
++                        for mode in built:
++                            target = provider.indices_dir / mode
++                            if target.exists():
++                                shutil.rmtree(target)
++                            if previous[mode]:
++                                (backup_root / mode).rename(target)
++                        provider._invalidate()
++                        raise
++                finally:
++                    shutil.rmtree(backup_root)
++        await asyncio.to_thread(publish)
++        return {mode: len(groups[mode]) for mode in groups}
+diff --git a/integrations/__init__.py b/integrations/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/integrations/__init__.py
+@@ -0,0 +1 @@
++"""External integration adapters."""
+diff --git a/integrations/ticketing.py b/integrations/ticketing.py
+new file mode 100644
+--- /dev/null
++++ b/integrations/ticketing.py
+@@ -0,0 +1,102 @@
++"""Timeout-bound webhook delivery with process-local UUID deduplication.
++
++No cross-pod dedupe/shared state is promised. Memory fallback is process-local.
++Query redaction is heuristic and cannot guarantee removal of all sensitive data.
++"""
++import asyncio
++from dataclasses import dataclass, field
++from datetime import datetime, timezone
++import hashlib
++import logging
++import uuid
++import httpx
++from analytics.writer import redact, safe_score
++from telegram_rag_bot.utils.metrics import TICKETS_CREATED, TICKETS_FAILED
++
++logger = logging.getLogger(__name__)
++
++
++@dataclass(frozen=True)
++class Ticket:
++    user_id: int
++    mode: str
++    query: str
++    reason: str
++    top_score: float | None = None
++    ticket_id: str = field(default_factory=lambda: str(uuid.uuid4()))
++    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
++
++
++@dataclass(frozen=True)
++class TicketResult:
++    ticket_id: str
++    success: bool
++    duplicate: bool = False
++    error_key: str | None = None
++
++
++class TicketClient:
++    def __init__(self, url, hr_chat_id=None, timeout=5, max_attempts=3, backoff=(1, 2, 4), *, transport=None, sleep=asyncio.sleep, metrics=None):
++        if not isinstance(url, str) or not url.startswith(('https://', 'http://')):
++            raise ValueError('ticket URL must be HTTP(S)')
++        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 60:
++            raise ValueError('invalid ticket timeout')
++        if type(max_attempts) is not int or not 1 <= max_attempts <= 3:
++            raise ValueError('at most three attempts allowed')
++        if len(backoff) < max_attempts - 1 or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not 0 <= x <= 60 for x in backoff):
++            raise ValueError('invalid backoff')
++        if hr_chat_id is not None and not isinstance(hr_chat_id, str):
++            raise ValueError('HR chat ID must be a string or None')
++        self.url, self.hr_chat_id, self.timeout = url, hr_chat_id, timeout
++        self.max_attempts, self.backoff = max_attempts, tuple(backoff)
++        self.transport, self.sleep = transport, sleep
++        self.created, self.failed = metrics or (TICKETS_CREATED, TICKETS_FAILED)
++        self._results = {}
++        self._lock = asyncio.Lock()
++
++    async def create(self, ticket: Ticket, *, session=None) -> TicketResult:
++        """Three POSTs maximum; sleeps 1/2 before attempts 2/3, never after failure.
++
++        A successful UUID is retained in-process and written to the supplied
++        mutable session. Caller persists that session using its session manager.
++        HTTP transport and sleep may be injected; tests need no real network.
++        """
++        ticket_id = str(uuid.UUID(str(ticket.ticket_id)))
++        if type(ticket.user_id) is not int or ticket.reason not in {'explicit', 'fallback_x2'} or not isinstance(ticket.mode, str):
++            raise ValueError('invalid ticket')
++        timestamp = datetime.fromisoformat(ticket.timestamp.replace('Z', '+00:00'))
++        if timestamp.tzinfo is None:
++            raise ValueError('timestamp requires timezone')
++        payload = dict(ticket_id=ticket_id,
++                       user_id_hash=hashlib.sha256(str(ticket.user_id).encode()).hexdigest(),
++                       mode=ticket.mode, query=redact(ticket.query, ticket.user_id),
++                       timestamp=timestamp.astimezone(timezone.utc).isoformat(),
++                       reason=ticket.reason, top_score=safe_score(ticket.top_score),
++                       notify_chat_id=self.hr_chat_id)
++        async with self._lock:
++            if ticket_id in self._results:
++                result = self._results[ticket_id]
++                return TicketResult(ticket_id, result.success, True, result.error_key)
++            if session is not None and session.get('active_ticket_uuid') == ticket_id:
++                return TicketResult(ticket_id, True, True)
++            async with httpx.AsyncClient(transport=self.transport, trust_env=False) as client:
++                for attempt in range(self.max_attempts):
++                    if attempt:
++                        await self.sleep(self.backoff[attempt - 1])
++                    try:
++                        response = await client.post(self.url, json=payload, timeout=self.timeout)
++                        success = 200 <= response.status_code < 300
++                    except (httpx.HTTPError, OSError):
++                        success = False
++                    if success:
++                        self.created.inc()
++                        if session is not None:
++                            session['active_ticket_uuid'] = ticket_id
++                        result = TicketResult(ticket_id, True)
++                        self._results[ticket_id] = result
++                        return result
++            self.failed.inc()
++            logger.error('ticket delivery failed after bounded attempts')
++            result = TicketResult(ticket_id, False, error_key='ticket.failed')
++            self._results[ticket_id] = result
++            return result
+diff --git a/analytics/__init__.py b/analytics/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/analytics/__init__.py
+@@ -0,0 +1 @@
++"""Local analytics adapters."""
+diff --git a/analytics/writer.py b/analytics/writer.py
+new file mode 100644
+--- /dev/null
++++ b/analytics/writer.py
+@@ -0,0 +1,70 @@
++"""Minimal redacted JSONL analytics. Redaction is heuristic, not a privacy guarantee."""
++from dataclasses import dataclass
++from datetime import datetime, timezone
++import json
++import math
++from pathlib import Path
++import re
++from threading import RLock
++
++_LOCK = RLock()
++_PATTERNS = (
++    r'\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b',
++    r'(?i)\b(?:bearer)\s+\S+',
++    r'(?i)\b(?:password|passwd|passphrase|token|api[_-]?key|secret|пароль|токен)\b\s*[:=]\s*(?:"[^"]*"|\'[^\']*\'|\S+)',
++    r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}',
++    r'(?<!\w)\+?\d[\d ()-]{8,}\d(?!\w)',
++    r'(?i)\b(?:telegram[_ ]?id|user[_ ]?id)\s*[:=]\s*\d+',
++)
++
++
++def redact(text: str, raw_id=None) -> str:
++    if not isinstance(text, str):
++        raise ValueError('query must be text')
++    if raw_id is not None:
++        text = re.sub(r'(?<!\d)' + re.escape(str(raw_id)) + r'(?!\d)', '[REDACTED]', text)
++    for pattern in _PATTERNS:
++        text = re.sub(pattern, '[REDACTED]', text)
++    return text
++
++
++def safe_score(value):
++    if value is None:
++        return None
++    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
++        raise ValueError('top_score must be finite and within [0,1]')
++    return float(value)
++
++
++@dataclass(frozen=True)
++class UnansweredEntry:
++    mode: str
++    reason: str
++    query_redacted: str
++    top_score: float | None = None
++
++
++class UnansweredWriter:
++    """Process-local thread serialization only; infra must provide a writable parent.
++
++    Each append is one UTF-8 write under a shared process lock. Multiple processes
++    writing the same volume need an external writer; no shared-state claim is made.
++    """
++    def __init__(self, path, *, fsync=False):
++        self.path = Path(path)
++        self.fsync = fsync
++
++    def write(self, entry: UnansweredEntry):
++        if entry.reason not in {'missing_plan', 'low_score'} or not isinstance(entry.mode, str):
++            raise ValueError('invalid unanswered entry')
++        record = dict(timestamp=datetime.now(timezone.utc).isoformat(), mode=entry.mode,
++                      reason=entry.reason, query_redacted=redact(entry.query_redacted),
++                      top_score=safe_score(entry.top_score))
++        line = (json.dumps(record, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8')
++        with _LOCK:
++            with self.path.open('ab', buffering=0) as stream:
++                if stream.write(line) != len(line):
++                    raise OSError('incomplete analytics append')
++                if self.fsync:
++                    import os
++                    os.fsync(stream.fileno())
