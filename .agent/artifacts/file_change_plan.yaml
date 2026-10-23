@@ -522,3 +522,10 @@
   - AC-C02
   - AC-C03
   reason: B3 read-only classification/proposal; index KEEP/UNSTAGE separately gated
+- path: README.md
+  action: add
+  owner_role: docs
+  linked_ac:
+  - AC-C01
+  - AC-C06
+  reason: User explicitly authorized a Russian root README styled after the upstream README; product facts and pending environment status preserved.
